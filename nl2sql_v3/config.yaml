@@ -25,11 +25,11 @@ recall:
     keyword: 0.1
     sparse: 0.6
     dense: 0.3
-  # 评估时，返回的最大数量
-  top_k: 5
+  # 废弃参数,单独做召回的时候有用,但是现在都用hybrid-search
+  top_k: 20
   keyword_threshold: 0.0
   similarity_threshold: 0.7
-  rerank_enabled: false
+  rerank_enabled: true
   # 表召回的最终数量
   rerank_top_k: 20
   rerank_threshold: 0.0

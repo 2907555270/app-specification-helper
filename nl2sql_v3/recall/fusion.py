@@ -127,10 +127,9 @@ class HybridRetriever:
             rankings = rerank_result.get("rankings", [])
 
             for idx, rank in enumerate(rankings):
-                if 0 <= rank < len(results):
+                if 1 <= rank <= len(results):
                     score = scores[idx] if idx < len(scores) else 0.0
-                    results[rank].rerank_score = score
-                    results[rank].score = score
+                    results[rank - 1].rerank_score = score
 
             results = [r for r in results if r.rerank_score >= self.rerank_threshold]
             results = results[:self.rerank_top_k]
