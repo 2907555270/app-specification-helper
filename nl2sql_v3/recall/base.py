@@ -12,6 +12,7 @@ class TableInfo(BaseModel):
 class RecallResult(BaseModel):
     db_name: str
     table_name: str
+    all_names: str
     score: float
     match_type: str
     rerank_score: Optional[float] = None

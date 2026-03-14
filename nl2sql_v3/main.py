@@ -134,6 +134,8 @@ def interactive():
 def recall(
     query: str,
     weights: str,
+    top_k: Optional[int],
+    show_scores: bool,
     no_keyword: bool,
     no_sparse: bool,
     no_dense: bool,
@@ -273,11 +275,11 @@ def build_index(force: bool, batch_size: int):
 def evaluate(
     db: Optional[str],
     output: Optional[str],
-    top_k_values: Optional[list[int]],
     verbose: bool,
     no_keyword: bool,
     no_sparse: bool,
     no_dense: bool,
+    top_k_values: Optional[list[int]] = None,
 ):
     """Evaluate recall performance using query data."""
     try:

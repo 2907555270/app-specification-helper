@@ -237,7 +237,6 @@ class ESClient:
         if knn_list:
             body["knn"] = knn_list[0] if len(knn_list) == 1 else knn_list
 
-        logger.debug(f"Hybrid search body: {body}")
         response = self.client.search(index=self.index, body=body)
         hits = response.get("hits", {}).get("hits", [])
         return [{"_score": hit["_score"], **hit["_source"]} for hit in hits]
