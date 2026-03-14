@@ -130,16 +130,16 @@ class RerankClient(APIClient):
         self,
         query: str,
         documents: List[str],
-        top_k: int = 5,
+        top_k: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
-        result = self._post(
-            self.url,
-            json_data={
-                "query": query,
-                "documents": documents,
-                "top_k": top_k,
-            },
-        )
+        json_data = {
+            "query": query,
+            "documents": documents,
+        }
+        if top_k is not None:
+            json_data["top_k"] = top_k
+
+        result = self._post(self.url, json_data=json_data)
         return result
 
 
