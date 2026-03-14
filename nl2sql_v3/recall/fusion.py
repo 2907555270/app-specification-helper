@@ -97,6 +97,7 @@ class HybridRetriever:
                         table_name=table_name,
                         all_names=all_names,
                         score=doc.get("_score", 0.0),
+                        rerank_score=0.0,
                         match_type="hybrid",
                     )
                 )
@@ -113,6 +114,8 @@ class HybridRetriever:
     def _rerank(self, query: str, results: List[RecallResult]) -> List[RecallResult]:
         if not results:
             return results
+
+        logger.info(f"Rerank enabled, processing {len(results)} results")
 
         table_docs = []
         for r in results:

@@ -159,10 +159,9 @@ def recall(
         retriever = HybridRetriever(
             tables=tables,
             weights=weights_dict,
-            top_k=top_k,
             use_keyword=not no_keyword,
             use_sparse=not no_sparse,
-            use_dense=not no_dense,
+            use_dense=not no_dense
         )
 
         click.echo(f"Query: {query}")
@@ -178,23 +177,17 @@ def recall(
         click.echo(f"\nTop {len(display_results)} Related Tables:")
         click.echo("-" * 70)
 
-        if show_scores:
-            header = f"{'DB Name':<20} {'Table Name':<20} {'Score':<10} {'Rerank':<10} {'Match Type':<12}"
-        else:
-            header = f"{'DB Name':<20} {'Table Name':<20} {'Match Type':<12}"
+        header = f"{'DB Name':<20} {'Table Name':<20} {'Score':<10} {'Rerank Score':<10} {'Match Type':<12}"
+
         click.echo(header)
         click.echo("-" * 70)
 
         for r in display_results:
             rerank_str = f"{r.rerank_score:.4f}" if r.rerank_score is not None else "N/A"
-            if show_scores:
-                click.echo(
-                    f"{r.db_name:<20} {r.table_name:<20} {r.score:<10.4f} {rerank_str:<10} {r.match_type:<12}"
-                )
-            else:
-                click.echo(
-                    f"{r.db_name:<20} {r.table_name:<20} {r.match_type:<12}"
-                )
+            click.echo(
+                f"{r.db_name:<20} {r.table_name:<20} {r.score:<10.4f} {rerank_str:<10} {r.match_type:<12}"
+            )
+
 
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
