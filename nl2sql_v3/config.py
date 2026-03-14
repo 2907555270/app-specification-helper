@@ -101,7 +101,12 @@ class Config(BaseModel):
         with open(config_file, "r", encoding="utf-8") as f:
             config_dict = yaml.safe_load(f)
 
+        logger.info(f"Loaded config from {config_file}: {config_dict}")
+        
         config_dict = cls._resolve_env_vars(config_dict)
+        
+        logger.info(f"Config recall weights: {config_dict.get('recall', {}).get('weights', 'NOT FOUND')}")
+
         return cls(**config_dict)
 
     @staticmethod
