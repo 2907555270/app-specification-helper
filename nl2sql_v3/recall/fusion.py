@@ -103,10 +103,12 @@ class HybridRetriever:
 
         if self.use_rerank and recall_results:
             recall_results = self._rerank(query, recall_results)
+            recall_results.sort(key=lambda x: x.rerank_score if x.rerank_score is not None else x.score, reverse=True)
+        else:
+            recall_results.sort(key=lambda x: x.score, reverse=True)
 
-        recall_results.sort(key=lambda x: x.score, reverse=True)
         logger.info(f"Hybrid retrieval complete: {len(recall_results)} results")
-        return recall_results
+        return recall_results[:self.top_k]
 
     def _rerank(self, query: str, results: List[RecallResult]) -> List[RecallResult]:
         if not results:
@@ -131,7 +133,7 @@ class HybridRetriever:
                     score = scores[idx] if idx < len(scores) else 0.0
                     results[rank - 1].rerank_score = score
 
-            results = [r for r in results if r.rerank_score >= self.rerank_threshold]
+            results = [r for r in results if r.rerank_score is not None and r.rerank_score >= self.rerank_threshold]
             results = results[:self.rerank_top_k]
 
         except Exception as e:
