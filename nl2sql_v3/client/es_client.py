@@ -180,6 +180,7 @@ class ESClient:
         sparse_weight: float = 1.0,
         dense_weight: float = 1.0,
         size: int = 10,
+        filter_db_name: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         should: List[Dict[str, Any]] = []
         knn_list: List[Dict[str, Any]] = []
@@ -217,13 +218,17 @@ class ESClient:
 
         body: Dict[str, Any] = {"size": size}
         
+        bool_query: Dict[str, Any] = {}
+        
         if should:
-            body["query"] = {
-                "bool": {
-                    "should": should,
-                    "minimum_should_match": 1 if len(should) > 1 else 0,
-                }
-            }
+            bool_query["should"] = should
+            bool_query["minimum_should_match"] = 1 if len(should) > 1 else 0
+        
+        if filter_db_name:
+            bool_query["filter"] = [{"term": {"db_name": filter_db_name}}]
+        
+        if bool_query:
+            body["query"] = {"bool": bool_query}
         
         if knn_list:
             body["knn"] = knn_list[0] if len(knn_list) == 1 else knn_list

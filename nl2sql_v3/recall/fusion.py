@@ -23,6 +23,7 @@ class HybridRetriever:
         use_keyword: bool = True,
         use_sparse: bool = True,
         use_dense: bool = True,
+        filter_db_name: Optional[str] = None,
     ):
         self.tables = tables
         self.weights = weights or {
@@ -34,12 +35,19 @@ class HybridRetriever:
         self.use_keyword = use_keyword
         self.use_sparse = use_sparse
         self.use_dense = use_dense
+        self.filter_db_name = filter_db_name
 
-    def retrieve(self, query: str) -> List[RecallResult]:
+    def retrieve(self, query: str, filter_db_name: Optional[str] = None) -> List[RecallResult]:
         if not query:
             return []
 
-        table_set = {(t.db_name, t.table_name) for t in self.tables}
+        target_db_name = filter_db_name or self.filter_db_name
+        
+        if target_db_name:
+            db_tables = [t for t in self.tables if t.db_name == target_db_name]
+            table_set = {(t.db_name, t.table_name) for t in db_tables}
+        else:
+            table_set = {(t.db_name, t.table_name) for t in self.tables}
         
         keyword_query = query if self.use_keyword else None
         sparse_vector = None
@@ -67,6 +75,7 @@ class HybridRetriever:
                 sparse_weight=self.weights.get("sparse", 1.0),
                 dense_weight=self.weights.get("dense", 1.0),
                 size=self.top_k,
+                filter_db_name=target_db_name,
             )
         except Exception as e:
             logger.error(f"Hybrid search failed: {e}")
