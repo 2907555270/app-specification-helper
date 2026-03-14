@@ -1,74 +1,64 @@
-import re
 import logging
 import sys
 import os
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from nl2sql_v3.recall.base import RecallResult, TableInfo
+from nl2sql_v3.client.es_client import es_client
 
 logger = logging.getLogger(__name__)
-
-
-def extract_keywords(text: str) -> List[str]:
-    text = text.lower()
-    words = re.findall(r"[a-zA-Z]+", text)
-    keywords = [w for w in words if len(w) > 2]
-    return keywords
 
 
 def keyword_recall(
     query: str,
     tables: List[TableInfo],
-    threshold: float = 0.5,
+    threshold: float = 0.0,
+    top_k: int = 10,
 ) -> List[RecallResult]:
-    keywords = extract_keywords(query)
-    query_lower = query.lower()
+    if not query or not tables:
+        return []
 
+    db_names = set(t.db_name for t in tables)
+    
     results = []
-    for table in tables:
-        score = 0.0
-
-        table_name_lower = table.table_name.lower()
-        if table_name_lower in query_lower:
-            score += 1.0
-        elif any(kw in table_name_lower for kw in keywords):
-            score += 0.5
-
-        for col in table.columns:
-            col_lower = col.lower()
-            if col_lower in query_lower:
-                score += 0.3
-            elif any(kw in col_lower for kw in keywords):
-                score += 0.1
-
-        for kw in keywords:
-            if kw in table_name_lower or any(kw in col.lower() for col in table.columns):
-                score += 0.2
-
-        if score >= threshold:
-            results.append(
-                RecallResult(
-                    db_name=table.db_name,
-                    table_name=table.table_name,
-                    score=score,
-                    match_type="keyword",
-                )
-            )
+    for db_name in db_names:
+        filter_query = {"term": {"db_name": db_name}}
+        hits = es_client.search(
+            query=query,
+            fields=["all_names", "table_name"],
+            filter_query=filter_query,
+            size=top_k,
+        )
+        
+        for hit in hits:
+            table_name = hit.get("table_name", "")
+            if any(t.db_name == db_name and t.table_name == table_name for t in tables):
+                score = hit.get("_score", 0) or 0.0
+                if score > threshold:
+                    results.append(
+                        RecallResult(
+                            db_name=db_name,
+                            table_name=table_name,
+                            score=score,
+                            match_type="keyword",
+                        )
+                    )
 
     results.sort(key=lambda x: x.score, reverse=True)
-    return results
+    return results[:top_k]
 
 
 class KeywordRecaller:
-    def __init__(self, threshold: float = 0.5):
+    def __init__(self, threshold: float = 0.0, top_k: int = 10):
         self.threshold = threshold
+        self.top_k = top_k
 
     def recall(
         self,
         query: str,
         tables: List[TableInfo],
     ) -> List[RecallResult]:
-        return keyword_recall(query, tables, self.threshold)
+        return keyword_recall(query, tables, self.threshold, self.top_k)
