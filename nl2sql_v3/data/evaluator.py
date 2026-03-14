@@ -127,9 +127,19 @@ class Evaluator:
         )
 
         results = retriever.retrieve(query.question)
-        recalled_tables = [r.table_name for r in results]
 
-        rerank_scores = [r.rerank_score for r in results if r.rerank_score is not None]
+        recalled_with_scores = []
+        for r in results:
+            item = {
+                "db_name": r.db_name,
+                "table_name": r.table_name,
+                "score": r.score,
+            }
+            if self.use_rerank and r.rerank_score is not None:
+                item["rerank_score"] = r.rerank_score
+            recalled_with_scores.append(item)
+
+        recalled_tables = [r.table_name for r in results]
 
         expected_set = set(query.tables)
         hit_result = {}
@@ -143,8 +153,8 @@ class Evaluator:
         for i, table in enumerate(recalled_tables):
             if table in expected_set:
                 mrr = 1.0 / (i + 1)
-                if rerank_scores:
-                    min_rerank_score = rerank_scores[i]
+                if i < len(results) and results[i].rerank_score is not None:
+                    min_rerank_score = results[i].rerank_score
                 break
 
         return {
@@ -154,8 +164,7 @@ class Evaluator:
             "detail": {
                 "question": query.question,
                 "expected": query.tables,
-                "recalled": recalled_tables,
-                "rerank_scores": rerank_scores if self.use_rerank else [],
+                "recalled": recalled_with_scores,
             },
             **hit_result,
             "mrr": mrr,
