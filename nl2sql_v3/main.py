@@ -301,6 +301,8 @@ def evaluate(
         click.echo(f"Hit Rate @ 3:    {result.hit_rate_at_3:.2%}")
         click.echo(f"Hit Rate @ 5:    {result.hit_rate_at_5:.2%}")
         click.echo(f"MRR:             {result.mrr:.4f}")
+        click.echo(f"Total Time:      {result.total_time:.2f}s")
+        click.echo(f"Avg Time:        {result.avg_time:.3f}s")
         click.echo("=" * 60)
 
         click.echo("\nRunning evaluation WITHOUT DB filter...")
@@ -314,6 +316,8 @@ def evaluate(
         click.echo(f"Hit Rate @ 3:    {result_no_filter.hit_rate_at_3:.2%}")
         click.echo(f"Hit Rate @ 5:    {result_no_filter.hit_rate_at_5:.2%}")
         click.echo(f"MRR:             {result_no_filter.mrr:.4f}")
+        click.echo(f"Total Time:      {result_no_filter.total_time:.2f}s")
+        click.echo(f"Avg Time:        {result_no_filter.avg_time:.3f}s")
         click.echo("=" * 60)
 
         if output:

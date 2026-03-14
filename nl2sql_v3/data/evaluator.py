@@ -1,6 +1,7 @@
 import logging
 import sys
 import os
+import time
 from pathlib import Path
 from typing import List, Optional
 
@@ -39,6 +40,7 @@ class Evaluator:
             top_k_values = [1, 3, 5]
 
         queries = self.query_loader.load()
+        start_time = time.time()
         if db_name:
             queries = [q for q in queries if q.db_name == db_name]
 
@@ -64,6 +66,9 @@ class Evaluator:
             reciprocal_ranks.append(result["mrr"])
 
         total = len(queries)
+        total_time = time.time() - start_time
+        avg_time = total_time / total if total > 0 else 0.0
+
         hit_rates = {k: hit_counts[k] / total for k in top_k_values}
         mrr = sum(reciprocal_ranks) / total if reciprocal_ranks else 0.0
 
@@ -74,6 +79,8 @@ class Evaluator:
             hit_rate_at_5=hit_rates.get(5, 0.0),
             mrr=mrr,
             details=details,
+            total_time=total_time,
+            avg_time=avg_time,
         )
 
         logger.info(f"Evaluation complete: Hit@1={eval_result.hit_rate_at_1:.2%}, Hit@3={eval_result.hit_rate_at_3:.2%}, Hit@5={eval_result.hit_rate_at_5:.2%}, MRR={eval_result.mrr:.2%}")

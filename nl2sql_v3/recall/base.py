@@ -29,6 +29,8 @@ class EvaluationResult(BaseModel):
     hit_rate_at_3: float
     hit_rate_at_5: float
     mrr: float
+    total_time: float = 0.0
+    avg_time: float = 0.0
     details: List[dict] = []
 
 
