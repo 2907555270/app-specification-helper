@@ -23,7 +23,7 @@ class HybridRetriever:
         use_sparse: bool = True,
         use_dense: bool = True,
         filter_db_name: Optional[str] = None,
-        use_rerank: Optional[bool] = None,
+        use_rerank: Optional[bool] = True,
     ):
         self.tables = tables
         self.weights = weights or {
@@ -135,7 +135,6 @@ class HybridRetriever:
                 if 1 <= rank <= len(results):
                     score = scores[idx] if idx < len(scores) else 0.0
                     results[rank - 1].rerank_score = score
-                    results[rank - 1].score = score
 
             results = [r for r in results if r.rerank_score >= self.rerank_threshold]
             results = results[:self.rerank_top_k]
