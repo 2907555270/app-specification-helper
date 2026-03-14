@@ -25,16 +25,16 @@ recall:
     keyword: 0.1
     sparse: 0.6
     dense: 0.3
-  # 废弃参数,单独做召回的时候有用,但是现在都用hybrid-search
+  # 召回器的最终返回结果
   top_k: 20
   keyword_threshold: 0.0
   similarity_threshold: 0.7
-  rerank_enabled: true
-  # 表召回的最终数量
-  rerank_top_k: 20
-  rerank_threshold: -20
   # 粗筛混搜时的最大数量
   hybrid_search_top_k: 100
+  rerank_enabled: true
+  # 精选后的返回结果数
+  rerank_top_k: 20
+  rerank_threshold: -20
 
 data:
   metadata: "../data/metadatas.json"

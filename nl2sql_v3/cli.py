@@ -213,7 +213,7 @@ def evaluate(
             use_dense=not no_dense,
         )
 
-        result = evaluator.evaluate(db_name=db)
+        result = evaluator.evaluate()
 
         click.echo("\n" + "=" * 60)
         click.echo("Evaluation Results")

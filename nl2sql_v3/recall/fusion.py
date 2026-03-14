@@ -17,16 +17,13 @@ logger = logging.getLogger(__name__)
 class HybridRetriever:
     def __init__(
         self,
-        tables: List[TableInfo],
         weights: Optional[Dict[str, float]] = None,
         top_k: Optional[int] = None,
         use_keyword: bool = True,
         use_sparse: bool = True,
         use_dense: bool = True,
-        filter_db_name: Optional[str] = None,
         use_rerank: Optional[bool] = True,
     ):
-        self.tables = tables
         self.weights = weights or {
             "keyword": config.recall.weights.keyword,
             "sparse": config.recall.weights.sparse,
@@ -36,7 +33,6 @@ class HybridRetriever:
         self.use_keyword = use_keyword
         self.use_sparse = use_sparse
         self.use_dense = use_dense
-        self.filter_db_name = filter_db_name
         self.use_rerank = use_rerank if use_rerank is not None else config.recall.rerank_enabled
         self.rerank_top_k = config.recall.rerank_top_k
         self.rerank_threshold = config.recall.rerank_threshold
@@ -45,8 +41,6 @@ class HybridRetriever:
     def retrieve(self, query: str, filter_db_name: Optional[str] = None) -> List[RecallResult]:
         if not query:
             return []
-
-        target_db_name = filter_db_name or self.filter_db_name
 
         keyword_query = query if self.use_keyword else None
         sparse_vector = None
@@ -74,7 +68,7 @@ class HybridRetriever:
                 sparse_weight=self.weights.get("sparse"),
                 dense_weight=self.weights.get("dense"),
                 size=self.hybrid_search_top_k,
-                filter_db_name=target_db_name,
+                filter_db_name=filter_db_name,
             )
         except Exception as e:
             logger.error(f"Hybrid search failed: {e}")
@@ -95,7 +89,7 @@ class HybridRetriever:
 
         if self.use_rerank and recall_results:
             recall_results = self._rerank(query, recall_results)
-            recall_results.sort(key=lambda x: x.rerank_score if x.rerank_score is not None else x.score, reverse=True)
+            recall_results.sort(key=lambda x: x.rerank_score, reverse=True)
         else:
             recall_results.sort(key=lambda x: x.score, reverse=True)
 
@@ -119,25 +113,17 @@ class HybridRetriever:
                 top_k=self.rerank_top_k,
             )
 
-            logger.info(f"Rerank API response: {rerank_result}")
-
             scores = rerank_result.get("scores", [])
             rankings = rerank_result.get("rankings", [])
 
-            logger.info(f"Scores: {scores}, Rankings: {rankings}")
-
-            for r in results:
-                r.rerank_score = 0.0
-
-            for idx, rank in enumerate(rankings):
+            for score, rank in zip(scores, rankings):
                 if 1 <= rank <= len(results):
-                    score = scores[idx] if idx < len(scores) else 0.0
                     results[rank - 1].rerank_score = score
-                    results[rank - 1].score = score
 
-            results = [r for r in results if r.rerank_score >= self.rerank_threshold]
-            logger.info(f"Rerank complete: {results}")
+            logger.debug(f"rerank threshold: {self.rerank_threshold}")
+            results = [r for r in results if r.rerank_score and r.rerank_score > -float("inf") and r.rerank_score >= self.rerank_threshold]
             results = results[:self.rerank_top_k]
+            logger.debug(f"Rerank complete: {results[0]}")
 
         except Exception as e:
             logger.warning(f"Rerank failed: {e}")

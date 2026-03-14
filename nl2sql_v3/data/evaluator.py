@@ -31,11 +31,9 @@ class Evaluator:
         self.weights = weights
         self.use_rerank = use_rerank if use_rerank is not None else config.recall.rerank_enabled
         self.query_loader = QueryLoader()
-        self.tables = metadata_loader.load()
 
     def evaluate(
         self,
-        db_name: Optional[str] = None,
         top_k_values: Optional[List[int]] = None,
         filter_db: bool = False,
     ) -> EvaluationResult:
@@ -44,8 +42,6 @@ class Evaluator:
 
         queries = self.query_loader.load()
         start_time = time.time()
-        if db_name:
-            queries = [q for q in queries if q.db_name == db_name]
 
         if not queries:
             logger.warning("No queries to evaluate")
@@ -102,22 +98,7 @@ class Evaluator:
         top_k_values: List[int],
         filter_db: bool = False,
     ) -> dict:
-        if filter_db:
-            db_tables = [t for t in self.tables if t.db_name == query.db_name]
-        else:
-            db_tables = self.tables
-        if not db_tables:
-            return {
-                "question": query.question,
-                "expected": query.tables,
-                "actual": [],
-                "detail": {},
-                **{f"hit@{k}": 0 for k in top_k_values},
-                "mrr": 0.0,
-            }
-
         retriever = HybridRetriever(
-            tables=db_tables,
             weights=self.weights,
             use_keyword=self.use_keyword,
             use_sparse=self.use_sparse,
@@ -125,7 +106,7 @@ class Evaluator:
             use_rerank=self.use_rerank,
         )
 
-        results = retriever.retrieve(query.question)
+        results = retriever.retrieve(query.question, filter_db_name=query.db_name if filter_db else None)
 
         recalled_with_scores = []
         for r in results:

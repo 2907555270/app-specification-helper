@@ -296,7 +296,7 @@ def evaluate(
             use_dense=not no_dense,
         )
 
-        result = evaluator.evaluate(db_name=db, filter_db=True, top_k_values=top_k_values)
+        result = evaluator.evaluate(filter_db=True, top_k_values=top_k_values)
 
         click.echo("\n" + "=" * 60)
         click.echo("Evaluation Results (With DB Filter)")
@@ -313,7 +313,7 @@ def evaluate(
         click.echo("=" * 60)
 
         click.echo("\nRunning evaluation WITHOUT DB filter...")
-        result_no_filter = evaluator.evaluate(db_name=db, filter_db=False)
+        result_no_filter = evaluator.evaluate(filter_db=False, top_k_values=top_k_values)
 
         click.echo("\n" + "=" * 60)
         click.echo("Evaluation Results (Without DB Filter)")
