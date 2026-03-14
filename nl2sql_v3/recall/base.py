@@ -15,7 +15,7 @@ class RecallResult(BaseModel):
     all_names: str
     score: float
     match_type: str
-    rerank_score: Optional[float] = None
+    rerank_score: float
 
 
 class TableMatch(BaseModel):

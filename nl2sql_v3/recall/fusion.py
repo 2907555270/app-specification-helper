@@ -128,8 +128,12 @@ class HybridRetriever:
                 top_k=self.rerank_top_k,
             )
 
+            logger.info(f"Rerank API response: {rerank_result}")
+
             scores = rerank_result.get("scores", [])
             rankings = rerank_result.get("rankings", [])
+
+            logger.info(f"Scores: {scores}, Rankings: {rankings}")
 
             for r in results:
                 r.rerank_score = 0.0
@@ -138,8 +142,10 @@ class HybridRetriever:
                 if 1 <= rank <= len(results):
                     score = scores[idx] if idx < len(scores) else 0.0
                     results[rank - 1].rerank_score = score
+                    results[rank - 1].score = score
 
             results = [r for r in results if r.rerank_score >= self.rerank_threshold]
+            logger.info(f"Rerank complete: {results}")
             results = results[:self.rerank_top_k]
 
         except Exception as e:
