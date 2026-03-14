@@ -176,12 +176,16 @@ class ESClient:
         query: str,
         sparse_vector: Optional[Dict[str, float]] = None,
         dense_vector: Optional[List[float]] = None,
-        keyword_weight: float = 1.0,
-        sparse_weight: float = 1.0,
-        dense_weight: float = 1.0,
+        keyword_weight: Optional[float] = None,
+        sparse_weight: Optional[float] = None,
+        dense_weight: Optional[float] = None,
         size: int = 10,
         filter_db_name: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
+        keyword_w = keyword_weight if keyword_weight is not None else config.recall.weights.keyword
+        sparse_w = sparse_weight if sparse_weight is not None else config.recall.weights.sparse
+        dense_w = dense_weight if dense_weight is not None else config.recall.weights.dense
+        
         should: List[Dict[str, Any]] = []
         knn_list: List[Dict[str, Any]] = []
 
@@ -189,9 +193,9 @@ class ESClient:
             should.append({
                 "multi_match": {
                     "query": query,
-                    "fields": ["all_names", "table_name"],
+                    "fields": ["all_names"],
                     "type": "best_fields",
-                    "boost": keyword_weight,
+                    "boost": keyword_w,
                 }
             })
 
@@ -200,7 +204,7 @@ class ESClient:
                 "sparse_vector": {
                     "field": "sparse_vector",
                     "query_vector": sparse_vector,
-                    "boost": sparse_weight,
+                    "boost": sparse_w,
                 }
             })
 
@@ -210,7 +214,7 @@ class ESClient:
                 "query_vector": dense_vector,
                 "k": size,
                 "similarity": 0.7,
-                "boost": dense_weight,
+                "boost": dense_w,
             })
 
         if not should and not knn_list:
