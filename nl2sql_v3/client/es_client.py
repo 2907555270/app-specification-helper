@@ -171,6 +171,64 @@ class ESClient:
         hits = response.get("hits", {}).get("hits", [])
         return [hit["_source"] for hit in hits]
 
+    def hybrid_search(
+        self,
+        query: str,
+        sparse_vector: Optional[Dict[str, float]] = None,
+        dense_vector: Optional[List[float]] = None,
+        keyword_weight: float = 1.0,
+        sparse_weight: float = 1.0,
+        dense_weight: float = 1.0,
+        size: int = 10,
+    ) -> List[Dict[str, Any]]:
+        must: List[Dict[str, Any]] = []
+
+        if query:
+            must.append({
+                "multi_match": {
+                    "query": query,
+                    "fields": ["all_names^2", "table_name^3", "columns_name"],
+                    "type": "best_fields",
+                    "boost": keyword_weight,
+                }
+            })
+
+        if sparse_vector:
+            must.append({
+                "sparse_vector": {
+                    "field": "sparse_vector",
+                    "query_vector": sparse_vector,
+                    "boost": sparse_weight,
+                }
+            })
+
+        if dense_vector:
+            must.append({
+                "knn": {
+                    "field": "dense_vector",
+                    "query_vector": dense_vector,
+                    "k": size,
+                    "similarity": 0.7,
+                    "boost": dense_weight,
+                }
+            })
+
+        if not must:
+            raise ValueError("At least one of query, sparse_vector, or dense_vector must be provided")
+
+        body: Dict[str, Any] = {
+            "size": size,
+            "query": {
+                "bool": {
+                    "must": must,
+                }
+            },
+        }
+
+        response = self.client.search(index=self.index, body=body)
+        hits = response.get("hits", {}).get("hits", [])
+        return [hit["_source"] for hit in hits]
+
     def delete_index(self, index_name: Optional[str] = None) -> bool:
         target_index = index_name or self.index
         if self.client.indices.exists(index=target_index):
