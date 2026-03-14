@@ -21,31 +21,30 @@ def keyword_recall(
     if not query or not tables:
         return []
 
-    db_names = set(t.db_name for t in tables)
+    table_set = {(t.db_name, t.table_name) for t in tables}
+    
+    hits = es_client.search(
+        query=query,
+        fields=["db_name", "table_name", "all_names"],
+        size=top_k,
+    )
     
     results = []
-    for db_name in db_names:
-        filter_query = {"term": {"db_name": db_name}}
-        hits = es_client.search(
-            query=query,
-            fields=["all_names", "table_name"],
-            filter_query=filter_query,
-            size=top_k,
-        )
+    for hit in hits:
+        db_name = hit.get("db_name", "")
+        table_name = hit.get("table_name", "")
         
-        for hit in hits:
-            table_name = hit.get("table_name", "")
-            if any(t.db_name == db_name and t.table_name == table_name for t in tables):
-                score = hit.get("_score", 0) or 0.0
-                if score > threshold:
-                    results.append(
-                        RecallResult(
-                            db_name=db_name,
-                            table_name=table_name,
-                            score=score,
-                            match_type="keyword",
-                        )
+        if (db_name, table_name) in table_set:
+            score = hit.get("_score", 0) or 0.0
+            if score > threshold:
+                results.append(
+                    RecallResult(
+                        db_name=db_name,
+                        table_name=table_name,
+                        score=score,
+                        match_type="keyword",
                     )
+                )
 
     results.sort(key=lambda x: x.score, reverse=True)
     return results[:top_k]
