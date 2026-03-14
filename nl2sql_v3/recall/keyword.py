@@ -23,9 +23,8 @@ def keyword_recall(
 
     table_set = {(t.db_name, t.table_name) for t in tables}
     
-    hits = es_client.search(
+    hits = es_client.bm25_search(
         query=query,
-        fields=["db_name", "table_name", "all_names"],
         size=top_k,
     )
     

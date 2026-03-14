@@ -112,6 +112,24 @@ class ESClient:
         hits = response.get("hits", {}).get("hits", [])
         return [hit["_source"] for hit in hits]
 
+    def bm25_search(
+        self,
+        query: str,
+        size: int = 10,
+    ) -> List[Dict]:
+        body = {
+            "size": size,
+            "query": {
+                "multi_match": {
+                    "query": query,
+                    "fields": ["all_names^2", "table_name^3", "columns_name"],
+                }
+            },
+        }
+        response = self.client.search(index=self.index, body=body)
+        hits = response["hits"]["hits"]
+        return [{"_score": hit["_score"], **hit["_source"]} for hit in hits]
+
     def knn_search(
         self,
         field: str,
