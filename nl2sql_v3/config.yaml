@@ -25,13 +25,16 @@ recall:
     keyword: 0.1
     sparse: 0.6
     dense: 0.3
+  # 评估时，返回的最大数量
   top_k: 5
   keyword_threshold: 0.0
   similarity_threshold: 0.7
   rerank_enabled: false
-  rerank_top_k: 10
+  # 表召回的最终数量
+  rerank_top_k: 20
   rerank_threshold: 0.0
-  hybrid_search_top_k: 50
+  # 粗筛混搜时的最大数量
+  hybrid_search_top_k: 100
 
 data:
   metadata: "../data/metadatas.json"

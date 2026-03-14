@@ -119,7 +119,6 @@ class Evaluator:
         retriever = HybridRetriever(
             tables=db_tables,
             weights=self.weights,
-            top_k=max(top_k_values),
             use_keyword=self.use_keyword,
             use_sparse=self.use_sparse,
             use_dense=self.use_dense,

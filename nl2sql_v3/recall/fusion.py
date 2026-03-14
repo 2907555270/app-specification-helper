@@ -19,7 +19,6 @@ class HybridRetriever:
         self,
         tables: List[TableInfo],
         weights: Optional[Dict[str, float]] = None,
-        top_k: Optional[int] = None,
         use_keyword: bool = True,
         use_sparse: bool = True,
         use_dense: bool = True,
@@ -32,7 +31,6 @@ class HybridRetriever:
             "sparse": config.recall.weights.sparse,
             "dense": config.recall.weights.dense,
         }
-        self.top_k = top_k if top_k is not None else config.recall.top_k
         self.use_keyword = use_keyword
         self.use_sparse = use_sparse
         self.use_dense = use_dense
@@ -108,7 +106,7 @@ class HybridRetriever:
 
         recall_results.sort(key=lambda x: x.score, reverse=True)
         logger.info(f"Hybrid retrieval complete: {len(recall_results)} results")
-        return recall_results[:self.top_k]
+        return recall_results
 
     def _rerank(self, query: str, results: List[RecallResult]) -> List[RecallResult]:
         if not results:
@@ -125,19 +123,14 @@ class HybridRetriever:
                 top_k=self.rerank_top_k,
             )
 
-            doc_scores = {}
-            for item in rerank_result.get("results", []):
-                doc_index = item.get("index", 0)
-                doc_score = item.get("score", 0.0)
-                if doc_index < len(results):
-                    doc_scores[doc_index] = doc_score
+            scores = rerank_result.get("scores", [])
+            rankings = rerank_result.get("rankings", [])
 
-            for i, r in enumerate(results):
-                if i in doc_scores:
-                    r.rerank_score = doc_scores[i]
-                    r.score = doc_scores[i]
-                else:
-                    r.rerank_score = 0.0
+            for idx, rank in enumerate(rankings):
+                if 0 <= rank < len(results):
+                    score = scores[idx] if idx < len(scores) else 0.0
+                    results[rank].rerank_score = score
+                    results[rank].score = score
 
             results = [r for r in results if r.rerank_score >= self.rerank_threshold]
             results = results[:self.rerank_top_k]

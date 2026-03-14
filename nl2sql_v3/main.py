@@ -48,8 +48,7 @@ def interactive():
             "keyword": config.recall.weights.keyword,
             "sparse": config.recall.weights.sparse,
             "dense": config.recall.weights.dense,
-        },
-        top_k=config.recall.top_k,
+        }
     )
 
     while True:
@@ -134,8 +133,6 @@ def interactive():
 )
 def recall(
     query: str,
-    top_k: int,
-    show_scores: bool,
     weights: str,
     no_keyword: bool,
     no_sparse: bool,
@@ -160,21 +157,21 @@ def recall(
         retriever = HybridRetriever(
             tables=tables,
             weights=weights_dict,
-            top_k=top_k,
             use_keyword=not no_keyword,
             use_sparse=not no_sparse,
             use_dense=not no_dense,
         )
 
         click.echo(f"Query: {query}")
-        click.echo(f"\nTop {top_k} Related Tables:")
-        click.echo("-" * 60)
 
         results = retriever.retrieve(query)
 
         if not results:
             click.echo("No related tables found.")
             return
+
+        click.echo(f"\nTop {len(results)} Related Tables:")
+        click.echo("-" * 60)
 
         header = f"{'DB Name':<20} {'Table Name':<20} {'Score':<10} {'Match Type':<10}"
         click.echo(header)
@@ -276,7 +273,7 @@ def build_index(force: bool, batch_size: int):
 def evaluate(
     db: Optional[str],
     output: Optional[str],
-    verbose: bool,
+    top_k_values: Optional[List[int]],
     no_keyword: bool,
     no_sparse: bool,
     no_dense: bool,
@@ -291,7 +288,7 @@ def evaluate(
             use_dense=not no_dense,
         )
 
-        result = evaluator.evaluate(db_name=db, filter_db=True)
+        result = evaluator.evaluate(db_name=db, filter_db=True, top_k_values=top_k_values)
 
         click.echo("\n" + "=" * 60)
         click.echo("Evaluation Results (With DB Filter)")
