@@ -236,7 +236,7 @@ class ESClient:
         logger.debug(f"Hybrid search body: {body}")
         response = self.client.search(index=self.index, body=body)
         hits = response.get("hits", {}).get("hits", [])
-        return [hit["_source"] for hit in hits]
+        return [{"_score": hit["_score"], **hit["_source"]} for hit in hits]
 
     def delete_index(self, index_name: Optional[str] = None) -> bool:
         target_index = index_name or self.index
