@@ -29,6 +29,7 @@ recall:
   keyword_threshold: 0.0
   similarity_threshold: 0.7
   rerank_enabled: false
+  rerank_top_k: 10
   rerank_threshold: 0.0
   hybrid_search_top_k: 50
 

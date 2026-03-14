@@ -57,6 +57,7 @@ class RecallConfig(BaseModel):
     keyword_threshold: float = 0.0
     similarity_threshold: float = 0.7
     rerank_enabled: bool = False
+    rerank_top_k: int = 10
     rerank_threshold: float = 0.0
     hybrid_search_top_k: int = 50
 

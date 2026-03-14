@@ -38,6 +38,7 @@ class HybridRetriever:
         self.use_dense = use_dense
         self.filter_db_name = filter_db_name
         self.use_rerank = use_rerank if use_rerank is not None else config.recall.rerank_enabled
+        self.rerank_top_k = config.recall.rerank_top_k
         self.rerank_threshold = config.recall.rerank_threshold
         self.hybrid_search_top_k = config.recall.hybrid_search_top_k
 
@@ -89,12 +90,14 @@ class HybridRetriever:
         for doc in results:
             db_name = doc.get("db_name", "")
             table_name = doc.get("table_name", "")
+            all_names = doc.get("all_names", "")
 
             if (db_name, table_name) in table_set:
                 recall_results.append(
                     RecallResult(
                         db_name=db_name,
                         table_name=table_name,
+                        all_names=all_names,
                         score=doc.get("_score", 0.0),
                         match_type="hybrid",
                     )
@@ -113,12 +116,13 @@ class HybridRetriever:
 
         table_docs = []
         for r in results:
-            table_docs.append(f"{r.table_name}")
+            table_docs.append(f"{r.all_names}")
 
         try:
             rerank_result = rerank_client.rerank(
                 query=query,
                 documents=table_docs,
+                top_k=self.rerank_top_k,
             )
 
             doc_scores = {}
@@ -136,6 +140,7 @@ class HybridRetriever:
                     r.rerank_score = 0.0
 
             results = [r for r in results if r.rerank_score >= self.rerank_threshold]
+            results = results[:self.rerank_top_k]
 
         except Exception as e:
             logger.warning(f"Rerank failed: {e}")
