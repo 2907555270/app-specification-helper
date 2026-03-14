@@ -175,17 +175,17 @@ def recall(
         display_results = results[:top_k] if top_k else results
 
         click.echo(f"\nTop {len(display_results)} Related Tables:")
-        click.echo("-" * 70)
+        click.echo("-" * 90)
 
-        header = f"{'DB Name':<20} {'Table Name':<20} {'Score':<10} {'Rerank Score':<10} {'Match Type':<12}"
+        header = f"{'DB Name':<20} {'Table Name':<20} {'Score':<10} {'Rerank Score':<15} {'Match Type':<12}"
 
         click.echo(header)
-        click.echo("-" * 70)
+        click.echo("-" * 90)
 
         for r in display_results:
             rerank_str = f"{r.rerank_score:.4f}" if r.rerank_score is not None else "N/A"
             click.echo(
-                f"{r.db_name:<20} {r.table_name:<20} {r.score:<10.4f} {rerank_str:<10} {r.match_type:<12}"
+                f"{r.db_name:<20} {r.table_name:<20} {r.score:<10.4f} {rerank_str:<15} {r.match_type:<12}"
             )
 
 

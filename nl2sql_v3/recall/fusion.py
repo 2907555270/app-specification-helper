@@ -19,6 +19,7 @@ class HybridRetriever:
         self,
         tables: List[TableInfo],
         weights: Optional[Dict[str, float]] = None,
+        top_k: Optional[int] = None,
         use_keyword: bool = True,
         use_sparse: bool = True,
         use_dense: bool = True,
@@ -31,6 +32,7 @@ class HybridRetriever:
             "sparse": config.recall.weights.sparse,
             "dense": config.recall.weights.dense,
         }
+        self.top_k = top_k if top_k is not None else config.recall.top_k
         self.use_keyword = use_keyword
         self.use_sparse = use_sparse
         self.use_dense = use_dense
@@ -45,12 +47,6 @@ class HybridRetriever:
             return []
 
         target_db_name = filter_db_name or self.filter_db_name
-
-        if target_db_name:
-            db_tables = [t for t in self.tables if t.db_name == target_db_name]
-            table_set = {(t.db_name, t.table_name) for t in db_tables}
-        else:
-            table_set = {(t.db_name, t.table_name) for t in self.tables}
 
         keyword_query = query if self.use_keyword else None
         sparse_vector = None
@@ -86,30 +82,25 @@ class HybridRetriever:
 
         recall_results = []
         for doc in results:
-            db_name = doc.get("db_name", "")
-            table_name = doc.get("table_name", "")
-            all_names = doc.get("all_names", "")
-
-            if (db_name, table_name) in table_set:
-                recall_results.append(
-                    RecallResult(
-                        db_name=db_name,
-                        table_name=table_name,
-                        all_names=all_names,
-                        score=doc.get("_score", 0.0),
-                        rerank_score=0.0,
-                        match_type="hybrid",
-                    )
+            recall_results.append(
+                RecallResult(
+                    db_name=doc.get("db_name", ""),
+                    table_name=doc.get("table_name", ""),
+                    all_names=doc.get("all_names", ""),
+                    score=doc.get("_score", 0.0),
+                    rerank_score=-float("inf"),
+                    match_type="hybrid",
                 )
+            )
 
         if self.use_rerank and recall_results:
             recall_results = self._rerank(query, recall_results)
-            recall_results.sort(key=lambda x: x.rerank_score, reverse=True)
+            recall_results.sort(key=lambda x: x.rerank_score if x.rerank_score is not None else x.score, reverse=True)
         else:
             recall_results.sort(key=lambda x: x.score, reverse=True)
 
         logger.info(f"Hybrid retrieval complete: {len(recall_results)} results")
-        return recall_results
+        return recall_results[:self.top_k]
 
     def _rerank(self, query: str, results: List[RecallResult]) -> List[RecallResult]:
         if not results:

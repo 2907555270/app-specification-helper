@@ -32,7 +32,7 @@ recall:
   rerank_enabled: true
   # 表召回的最终数量
   rerank_top_k: 20
-  rerank_threshold: 0.0
+  rerank_threshold: -20
   # 粗筛混搜时的最大数量
   hybrid_search_top_k: 100
 
