@@ -21,6 +21,10 @@ class TranslateConfig(BaseModel):
     url: str = "http://127.0.0.1:8000/api/v1/translate"
 
 
+class RerankConfig(BaseModel):
+    url: str = "http://127.0.0.1:8000/api/v1/rerank"
+
+
 class ElasticsearchConfig(BaseModel):
     hosts: List[str] = ["http://192.168.116.5:9200"]
     index: str = "tables-metadata"
@@ -36,6 +40,7 @@ class ServicesConfig(BaseModel):
     sparse_vector: SparseVectorConfig = SparseVectorConfig()
     dense_vector: DenseVectorConfig = DenseVectorConfig()
     translate: TranslateConfig = TranslateConfig()
+    rerank: RerankConfig = RerankConfig()
     elasticsearch: ElasticsearchConfig = ElasticsearchConfig()
     llm: LLMConfig = LLMConfig()
 
@@ -51,6 +56,9 @@ class RecallConfig(BaseModel):
     top_k: int = 5
     keyword_threshold: float = 0.0
     similarity_threshold: float = 0.7
+    rerank_enabled: bool = False
+    rerank_top_k: int = 5
+    hybrid_search_top_k: int = 50
 
 
 class DataConfig(BaseModel):

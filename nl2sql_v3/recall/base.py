@@ -14,6 +14,7 @@ class RecallResult(BaseModel):
     table_name: str
     score: float
     match_type: str
+    rerank_score: Optional[float] = None
 
 
 class TableMatch(BaseModel):
@@ -32,6 +33,7 @@ class EvaluationResult(BaseModel):
     total_time: float = 0.0
     avg_time: float = 0.0
     details: List[dict] = []
+    min_rerank_threshold: Optional[float] = None
 
 
 class QueryRecord(BaseModel):

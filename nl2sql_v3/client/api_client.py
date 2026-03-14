@@ -121,7 +121,30 @@ class LLMClient(APIClient):
         return ""
 
 
+class RerankClient(APIClient):
+    def __init__(self):
+        super().__init__()
+        self.url = config.services.rerank.url
+
+    def rerank(
+        self,
+        query: str,
+        documents: List[str],
+        top_k: int = 5,
+    ) -> List[Dict[str, Any]]:
+        result = self._post(
+            self.url,
+            json_data={
+                "query": query,
+                "documents": documents,
+                "top_k": top_k,
+            },
+        )
+        return result
+
+
 sparse_vector_client = SparseVectorClient()
 dense_vector_client = DenseVectorClient()
 translate_client = TranslateClient()
 llm_client = LLMClient()
+rerank_client = RerankClient()

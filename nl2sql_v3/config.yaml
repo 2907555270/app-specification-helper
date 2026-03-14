@@ -7,6 +7,8 @@ services:
     url: "http://127.0.0.1:8000/api/v1/dense_vector"
   translate:
     url: "http://127.0.0.1:8000/api/v1/translate"
+  rerank:
+    url: "http://127.0.0.1:8000/api/v1/rerank"
 
   elasticsearch:
     hosts:
@@ -26,6 +28,9 @@ recall:
   top_k: 5
   keyword_threshold: 0.0
   similarity_threshold: 0.7
+  rerank_enabled: false
+  rerank_top_k: 5
+  hybrid_search_top_k: 50
 
 data:
   metadata: "../data/metadatas.json"

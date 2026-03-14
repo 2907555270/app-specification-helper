@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from nl2sql_v3.config import config
 from nl2sql_v3.recall.base import RecallResult, TableInfo
 from nl2sql_v3.client.es_client import es_client
-from nl2sql_v3.client.api_client import sparse_vector_client, dense_vector_client
+from nl2sql_v3.client.api_client import sparse_vector_client, dense_vector_client, rerank_client
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +24,7 @@ class HybridRetriever:
         use_sparse: bool = True,
         use_dense: bool = True,
         filter_db_name: Optional[str] = None,
+        use_rerank: Optional[bool] = None,
     ):
         self.tables = tables
         self.weights = weights or {
@@ -36,19 +37,22 @@ class HybridRetriever:
         self.use_sparse = use_sparse
         self.use_dense = use_dense
         self.filter_db_name = filter_db_name
+        self.use_rerank = use_rerank if use_rerank is not None else config.recall.rerank_enabled
+        self.rerank_top_k = config.recall.rerank_top_k
+        self.hybrid_search_top_k = config.recall.hybrid_search_top_k
 
     def retrieve(self, query: str, filter_db_name: Optional[str] = None) -> List[RecallResult]:
         if not query:
             return []
 
         target_db_name = filter_db_name or self.filter_db_name
-        
+
         if target_db_name:
             db_tables = [t for t in self.tables if t.db_name == target_db_name]
             table_set = {(t.db_name, t.table_name) for t in db_tables}
         else:
             table_set = {(t.db_name, t.table_name) for t in self.tables}
-        
+
         keyword_query = query if self.use_keyword else None
         sparse_vector = None
         dense_vector = None
@@ -74,7 +78,7 @@ class HybridRetriever:
                 keyword_weight=self.weights.get("keyword"),
                 sparse_weight=self.weights.get("sparse"),
                 dense_weight=self.weights.get("dense"),
-                size=self.top_k,
+                size=self.hybrid_search_top_k,
                 filter_db_name=target_db_name,
             )
         except Exception as e:
@@ -96,6 +100,43 @@ class HybridRetriever:
                     )
                 )
 
+        if self.use_rerank and recall_results:
+            recall_results = self._rerank(query, recall_results)
+
         recall_results.sort(key=lambda x: x.score, reverse=True)
         logger.info(f"Hybrid retrieval complete: {len(recall_results)} results")
         return recall_results[:self.top_k]
+
+    def _rerank(self, query: str, results: List[RecallResult]) -> List[RecallResult]:
+        if not results:
+            return results
+
+        table_docs = []
+        for r in results:
+            table_docs.append(f"{r.table_name}")
+
+        try:
+            rerank_result = rerank_client.rerank(
+                query=query,
+                documents=table_docs,
+                top_k=self.rerank_top_k,
+            )
+
+            doc_scores = {}
+            for item in rerank_result.get("results", []):
+                doc_index = item.get("index", 0)
+                doc_score = item.get("score", 0.0)
+                if doc_index < len(results):
+                    doc_scores[doc_index] = doc_score
+
+            for i, r in enumerate(results):
+                if i in doc_scores:
+                    r.rerank_score = doc_scores[i]
+                    r.score = doc_scores[i]
+                else:
+                    r.rerank_score = 0.0
+
+        except Exception as e:
+            logger.warning(f"Rerank failed: {e}")
+
+        return results
