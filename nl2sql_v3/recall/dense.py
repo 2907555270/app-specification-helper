@@ -9,14 +9,15 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from nl2sql_v3.client.api_client import dense_vector_client
 from nl2sql_v3.client.es_client import es_client
 from nl2sql_v3.recall.base import RecallResult
+from nl2sql_v3.config import config
 
 logger = logging.getLogger(__name__)
 
 
 class DenseRecaller:
-    def __init__(self, top_k: int = 10, similarity_threshold: float = 0.7):
-        self.top_k = top_k
-        self.similarity_threshold = similarity_threshold
+    def __init__(self, top_k: Optional[int] = None, similarity_threshold: Optional[float] = None):
+        self.top_k = top_k if top_k is not None else config.recall.top_k
+        self.similarity_threshold = similarity_threshold if similarity_threshold is not None else config.recall.similarity_threshold
 
     def recall(self, query: str) -> List[RecallResult]:
         try:
@@ -56,6 +57,6 @@ class DenseRecaller:
             return []
 
 
-def dense_recall(query: str, top_k: int = 10) -> List[RecallResult]:
+def dense_recall(query: str, top_k: Optional[int] = None) -> List[RecallResult]:
     recaller = DenseRecaller(top_k=top_k)
     return recaller.recall(query)

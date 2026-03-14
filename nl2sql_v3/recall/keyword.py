@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from nl2sql_v3.recall.base import RecallResult, TableInfo
 from nl2sql_v3.client.es_client import es_client
+from nl2sql_v3.config import config
 
 logger = logging.getLogger(__name__)
 
@@ -15,11 +16,14 @@ logger = logging.getLogger(__name__)
 def keyword_recall(
     query: str,
     tables: List[TableInfo],
-    threshold: float = 0.0,
-    top_k: int = 10,
+    threshold: Optional[float] = None,
+    top_k: Optional[int] = None,
 ) -> List[RecallResult]:
     if not query or not tables:
         return []
+
+    threshold = threshold if threshold is not None else config.recall.keyword_threshold
+    top_k = top_k if top_k is not None else config.recall.top_k
 
     table_set = {(t.db_name, t.table_name) for t in tables}
     
@@ -50,9 +54,9 @@ def keyword_recall(
 
 
 class KeywordRecaller:
-    def __init__(self, threshold: float = 0.0, top_k: int = 10):
-        self.threshold = threshold
-        self.top_k = top_k
+    def __init__(self, threshold: Optional[float] = None, top_k: Optional[int] = None):
+        self.threshold = threshold if threshold is not None else config.recall.keyword_threshold
+        self.top_k = top_k if top_k is not None else config.recall.top_k
 
     def recall(
         self,

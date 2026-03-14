@@ -9,13 +9,14 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from nl2sql_v3.client.api_client import sparse_vector_client
 from nl2sql_v3.client.es_client import es_client
 from nl2sql_v3.recall.base import RecallResult
+from nl2sql_v3.config import config
 
 logger = logging.getLogger(__name__)
 
 
 class SparseRecaller:
-    def __init__(self, top_k: int = 10):
-        self.top_k = top_k
+    def __init__(self, top_k: Optional[int] = None):
+        self.top_k = top_k if top_k is not None else config.recall.top_k
 
     def recall(self, query: str) -> List[RecallResult]:
         try:
@@ -56,6 +57,6 @@ class SparseRecaller:
             return []
 
 
-def sparse_recall(query: str, top_k: int = 10) -> List[RecallResult]:
+def sparse_recall(query: str, top_k: Optional[int] = None) -> List[RecallResult]:
     recaller = SparseRecaller(top_k=top_k)
     return recaller.recall(query)

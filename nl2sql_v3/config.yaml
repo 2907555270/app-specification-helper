@@ -21,14 +21,15 @@ services:
 recall:
   weights:
     keyword: 0.1
-    sparse: 0.5
-    dense: 0.4
+    sparse: 0.6
+    dense: 0.3
   top_k: 5
-  keyword_threshold: 0.5
+  keyword_threshold: 0.0
+  similarity_threshold: 0.7
 
 data:
   metadata: "../data/metadatas.json"
   queries: "../data/query_and_tables.json"
 
 logging:
-  level: "DEBUG"
+  level: "INFO"

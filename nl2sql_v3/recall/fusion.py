@@ -19,7 +19,7 @@ class HybridRetriever:
         self,
         tables: List[TableInfo],
         weights: Optional[Dict[str, float]] = None,
-        top_k: int = 5,
+        top_k: Optional[int] = None,
         use_keyword: bool = True,
         use_sparse: bool = True,
         use_dense: bool = True,
@@ -31,7 +31,7 @@ class HybridRetriever:
             "sparse": config.recall.weights.sparse,
             "dense": config.recall.weights.dense,
         }
-        self.top_k = top_k
+        self.top_k = top_k if top_k is not None else config.recall.top_k
         self.use_keyword = use_keyword
         self.use_sparse = use_sparse
         self.use_dense = use_dense

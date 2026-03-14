@@ -140,6 +140,73 @@ class EvaluationResult(BaseModel):
 }
 ```
 
+### 3.4 BGE-M3 接口（推荐）
+
+#### BGE-M3 编码
+
+**端点**: `POST /api/v1/bge/encode`
+
+单模型同时输出 Dense 和 Sparse 向量。
+
+**请求体**:
+```json
+{
+    "text": "要向量化的文本",
+    "batch_size": 32,
+    "max_length": 512,
+    "dense_output": true,
+    "sparse_output": true,
+    "colbert_output": false
+}
+```
+
+**响应**:
+```json
+{
+    "dense_vecs": [[0.1, 0.2, ...]],
+    "sparse_vecs": [{'79315': 0.34375}],
+    "colbert_vecs": null
+}
+```
+
+### 3.5 BGE-Reranker 接口（Cross-Encoder）
+
+BGE-Reranker 是 Cross-Encoder 模型，比 Bi-Encoder 的 Embedding 模型精度更高。适用于检索后对文档进行重排序。
+
+#### BGE-Reranker 重排序
+
+对文档按与查询的相关性进行排序，返回排序后的文档和分数。
+
+**请求**:
+```json
+{
+    "query": "什么是人工智能",
+    "documents": [
+        "人工智能是计算机科学的一个分支",
+        "今天天气很好",
+        "机器学习是人工智能的一个子领域",
+        "python是一种编程语言"
+    ],
+    "top_k": 3,
+    "batch_size": 32
+}
+```
+
+**响应**:
+```json
+{
+    "query": "什么是人工智能",
+    "documents": [
+        "人工智能是计算机科学的一个分支",
+        "机器学习是人工智能的一个子领域",
+        "今天天气很好"
+    ],
+    "scores": [0.95, 0.82, 0.21],
+    "rankings": [1, 2, 4],
+    "total": 4
+}
+```
+
 ---
 
 ## 4. CLI命令接口
