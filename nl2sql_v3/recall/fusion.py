@@ -71,9 +71,9 @@ class HybridRetriever:
                 query=keyword_query,
                 sparse_vector=sparse_vector if sparse_vector else None,
                 dense_vector=dense_vector if dense_vector else None,
-                keyword_weight=self.weights.get("keyword", 1.0),
-                sparse_weight=self.weights.get("sparse", 1.0),
-                dense_weight=self.weights.get("dense", 1.0),
+                keyword_weight=self.weights.get("keyword"),
+                sparse_weight=self.weights.get("sparse"),
+                dense_weight=self.weights.get("dense"),
                 size=self.top_k,
                 filter_db_name=target_db_name,
             )
