@@ -230,7 +230,7 @@ class ESClient:
 
             start_time = time.time()
             raw_runs = [run.run["q1"] for run in runs_list]
-            logger.info(f"RRF raw runs list: {raw_runs}")
+            logger.info(f"RRF raw runs count: {[len(r) for r in raw_runs]}")
             fused_results = self.manual_rrf(raw_runs, k=60)
             logger.info(f"RRF fused search time: {time.time() - start_time}")
 
