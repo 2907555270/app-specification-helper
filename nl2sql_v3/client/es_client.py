@@ -200,42 +200,42 @@ class ESClient:
             if query:
                 start_es = time.time()
                 keyword_results = self.keyword_search(query, size=size, filter_db_name=filter_db_name)
-                logger.debug(f"keyword search took {time.time()-start_es:.2f}s, hits={len(keyword_results)}")
+                logger.info(f"keyword search took {time.time()-start_es:.2f}s, hits={len(keyword_results)}")
                 if keyword_results:
                     keyword_run_dict: Dict[str, float] = {}
                     for doc in keyword_results:
                         doc_id = f"{doc.get('db_name', '')}_{doc.get('table_name', '')}"
-                        keyword_run_dict[doc_id] = doc.get("_score", 0.0) * keyword_w
+                        keyword_run_dict[doc_id] = doc.get("_score", 0.0)
                     raw_runs.append(keyword_run_dict)
 
             if sparse_vector:
                 start_es = time.time()
                 sparse_results = self.sparse_search(sparse_vector, size=size, filter_db_name=filter_db_name)
-                logger.debug(f"sparse  search took {time.time()-start_es:.2f}s, hits={len(sparse_results)}")
+                logger.info(f"sparse  search took {time.time()-start_es:.2f}s, hits={len(sparse_results)}")
                 if sparse_results:
                     sparse_run_dict: Dict[str, float] = {}
                     for doc in sparse_results:
                         doc_id = f"{doc.get('db_name', '')}_{doc.get('table_name', '')}"
-                        sparse_run_dict[doc_id] = doc.get("_score", 0.0) * sparse_w
+                        sparse_run_dict[doc_id] = doc.get("_score", 0.0)
                     raw_runs.append(sparse_run_dict)
 
             if dense_vector:
                 start_es = time.time()
                 dense_results = self.dense_search(dense_vector, size=size, filter_db_name=filter_db_name)
-                logger.debug(f"dense   search took {time.time()-start_es:.2f}s, hits={len(dense_results)}")
+                logger.info(f"dense   search took {time.time()-start_es:.2f}s, hits={len(dense_results)}")
                 if dense_results:
                     dense_run_dict: Dict[str, float] = {}
                     for doc in dense_results:
                         doc_id = f"{doc.get('db_name', '')}_{doc.get('table_name', '')}"
-                        dense_run_dict[doc_id] = doc.get("_score", 0.0) * dense_w
+                        dense_run_dict[doc_id] = doc.get("_score", 0.0)
                     raw_runs.append(dense_run_dict)
 
             if not raw_runs:
                 raise ValueError("At least one of query, sparse_vector, or dense_vector must be provided")
 
             start_time = time.time()
-            fused_results = self.manual_rrf(raw_runs, k=60)
-            logger.debug(f"RRF fused search time: {time.time() - start_time}")
+            fused_results = self.manual_rrf(raw_runs, k=size, weights=[keyword_w, sparse_w, dense_w])
+            logger.info(f"RRF fused search time: {time.time() - start_time}")
 
             doc_id_to_data = {}
             all_results = []
@@ -254,7 +254,7 @@ class ESClient:
             for doc_id, score in fused_results:
                 if doc_id in doc_id_to_data:
                     doc = doc_id_to_data[doc_id]
-                    final_results.append({"_score": score, **doc})
+                    final_results.append({"rrf_score": score, **doc})
 
             return final_results
 
@@ -380,23 +380,21 @@ class ESClient:
         size: int = 100,
         filter_db_name: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        body: Dict[str, Any] = {
-            "size": size,
-            "knn": {
-                "field": "dense_vector",
-                "query_vector": dense_vector,
-                "k": size,
-                "num_candidates": size * 2,
-            }
+        knn_config: Dict[str, Any] = {
+            "field": "dense_vector",
+            "query_vector": dense_vector,
+            "k": size,
+            "num_candidates": size * 2,
         }
 
         logger.info(f"filter_db_name: {filter_db_name}")
         if filter_db_name:
-            body["query"] = {
-                "bool": {
-                    "filter": [{"term": {"db_name": filter_db_name}}]
-                }
-            }
+            knn_config["filter"] = {"term": {"db_name": filter_db_name}}
+
+        body: Dict[str, Any] = {
+            "size": size,
+            "knn": knn_config
+        }
 
         logger.debug(f"dense query body: {body}")
         response = self.client.search(index=self.index, body=body)
@@ -414,22 +412,23 @@ class ESClient:
     def get_stats(self) -> Dict[str, Any]:
         return self.client.indices.stats(index=self.index)
     
-    def manual_rrf(self, all_runs: List[Dict[str, float]], k: int = 60) -> List[tuple]:
+    def manual_rrf(self, all_runs: List[Dict[str, float]], k: int = 60, weights: Optional[List[float]] = None) -> List[tuple]:
         doc_scores: Dict[str, float] = {}
-        for run_dict in all_runs:
+        weights = weights or [1.0] * len(all_runs)
+        for run_dict, weight in zip(all_runs, weights):
             if not run_dict:
                 continue
             sorted_items = sorted(run_dict.items(), key=lambda x: x[1], reverse=True)
             for rank, (doc_id, score) in enumerate(sorted_items, 1):
                 if doc_id not in doc_scores:
                     doc_scores[doc_id] = 0.0
-                doc_scores[doc_id] += 1.0 / (k + rank)
+                doc_scores[doc_id] += weight * 10 * 1.0 / (k + rank)
         
         if not doc_scores:
             return []
         
         sorted_docs = sorted(doc_scores.items(), key=lambda x: x[1], reverse=True)
-        return sorted_docs
+        return sorted_docs[:k]
 
 
 es_client = ESClient()

@@ -117,9 +117,9 @@ class Evaluator:
                 "db_name": r.db_name,
                 "table_name": r.table_name,
                 "score": r.score,
+                "rrf_score": r.rrf_score,
+                "rerank_score": r.rerank_score,
             }
-            if self.use_rerank and r.rerank_score is not None:
-                item["rerank_score"] = r.rerank_score
             recalled_with_scores.append(item)
 
         recalled_tables = [r.table_name for r in results]
