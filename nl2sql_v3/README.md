@@ -230,6 +230,7 @@ nl2sql_v3/
 ## 相关文档
 
 - [RAG 技术指南](./technical_doc/rag.md) - 检索与重排技术详解
+- [表召回-问题记录](./technical_doc/rag_explore.md) - 检索与重排技术问题记录
 - [基准测试报告](./technical_doc/benchmark.md) - 性能评估与优化建议
 
 ## 许可证
