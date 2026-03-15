@@ -45,65 +45,37 @@ AI 驱动的应用规格说明书生成与项目初始化工具
 
 ### 3. 项目初始化
 
-AI 阅读 `templates/` 目录下的所有模板文件，理解项目需求和技术规格后，自动生成项目代码。
+AI 阅读 `templates/` 目录下的所有模板文件，理解项目需求和技术规格后，生成初始项目代码。
 
 ```
 templates/*.md → AI 阅读理解 → 项目代码生成
 ```
 
-## 项目示例：nl2sql_v3
+## 工作原理
 
-[nl2sql_v3](./nl2sql_v3/) 是基于本工具生成的 NL2SQL 表召回系统。
+1. **用户描述**：告诉 AI 你想开发什么项目
+2. **AI 引导**：通过一系列问题帮助你梳理需求
+3. **生成模板**：自动创建规范的项目文档
+4. **初始化项目**：AI 阅读模板并生成基础代码框架
 
-### 生成过程
+## 局限性
 
-1. **用户描述需求**：想要一个 NL2SQL 表召回工具
-2. **AI 引导提问**：了解检索方式、向量模型、重排需求等
-3. **生成模板文档**：创建了 requirements.md、architecture.md 等
-4. **AI 阅读模板**：理解混合检索、RRF 融合、重排等技术方案
-5. **生成项目代码**：完成 ES 客户端、召回模块、CLI 接口等
+⚠️ **重要提示**：
 
-### 技术特性
+- **初始框架**：Skill 帮助你搭建项目的**初始框架**，生成规范的项目文档
+- **方案设计**：具体的技术方案、架构设计、实现路径需要**你自己思考和完善**
+- **持续迭代**：项目的完整实现需要在开发过程中**不断调整和优化**
 
-- 多路混合检索（BM25 + Sparse + Dense）
-- Weighted RRF 融合排序
-- Cross-Encoder 重排
-- CLI 交互式查询
-- 批量评估功能
+也就是说，AI 可以帮你：
+- 整理思路，形成规范文档
+- 生成基础代码结构
+- 提供技术选型建议
 
-### 性能指标
+但最终的技术决策和实现细节，需要结合你的业务场景和实践经验来确定。
 
-| 场景 | Hit@5 | MRR |
-|------|-------|-----|
-| Determined | **100%** | 0.93 |
-| Not Determined | 85.3% | 0.70 |
+## 项目示例
 
-## 快速开始
-
-### 使用 SKILL
-
-1. 告诉 AI 你想开发什么项目
-2. AI 会引导你回答一系列问题
-3. 查看生成的模板文档
-4. 确认后 AI 开始生成项目代码
-
-### 运行 nl2sql_v3
-
-```bash
-cd nl2sql_v3
-
-# 安装依赖
-pip install -e .
-
-# 配置服务
-编辑 config.yaml
-
-# 构建索引
-python main.py build-index
-
-# 交互式查询
-python main.py interactive
-```
+[nl2sql_v3](./nl2sql_v3/) 是基于本工具生成的 NL2SQL 表召回系统，展示了从需求描述到项目初始化的完整过程。
 
 ## 目录结构
 
@@ -119,12 +91,7 @@ python main.py interactive
 │   ├── architecture.md
 │   ├── api.md
 │   └── update.md
-├── nl2sql_v3/                  # 生成的 NL2SQL 项目
-│   ├── client/
-│   ├── recall/
-│   ├── technical_doc/
-│   ├── main.py
-│   └── config.yaml
+├── nl2sql_v3/                  # 生成的示例项目
 └── README.md                   # 本文件
 ```
 
@@ -133,4 +100,3 @@ python main.py interactive
 - [nl2sql_v3 项目文档](./nl2sql_v3/README.md)
 - [RAG 技术指南](./nl2sql_v3/technical_doc/rag.md)
 - [基准测试报告](./nl2sql_v3/technical_doc/benchmark.md)
-- [问题记录](./nl2sql_v3/technical_doc/rag_explore.md)
