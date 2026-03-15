@@ -221,7 +221,7 @@ class ESClient:
                     dense_run_dict = {"q1": {}}
                     for i, doc in enumerate(dense_results):
                         doc_id = f"{doc.get('db_name', '')}_{doc.get('table_name', '')}"
-                        dense_run_dict["q1"][doc_id] = doc.get("rrf_score", 0.0) * dense_w
+                        dense_run_dict["q1"][doc_id] = doc.get("_score", 0.0) * dense_w
                     runs_list.append(Run(dense_run_dict))
 
             if not runs_list:
