@@ -18,6 +18,7 @@ class ESClient:
     def __init__(self):
         self.hosts = config.services.elasticsearch.hosts
         self.index = config.services.elasticsearch.index
+        self.dense_dim = config.services.elasticsearch.dense_dim
         self.client = Elasticsearch(
             self.hosts,
             request_timeout=30,
@@ -45,16 +46,23 @@ class ESClient:
                 "properties": {
                     "db_name": {"type": "keyword"},
                     "table_name": {"type": "keyword"},
+                    "table_name_cn": {"type": "text"},
                     "all_names": {
                         "type": "text",
                         "analyzer": "standard",
                     },
+                    "columns_name": {"type": "text"},
+                    "columns_name_cn": {"type": "text"},
+                    "columns": {"type": "object", "enabled": False},
+                    "primary_keys": {"type": "keyword"},
+                    "foreign_keys": {"type": "object", "enabled": False},
+                    "related_tables": {"type": "object", "enabled": False},
                     "sparse_vector": {
                         "type": "sparse_vector",
                     },
                     "dense_vector": {
                         "type": "dense_vector",
-                        "dims": 384,
+                        "dims": self.dense_dim,
                         "index": True,
                         "similarity": "cosine",
                     },
@@ -231,7 +239,8 @@ class ESClient:
                     raw_runs.append(dense_run_dict)
 
             if not raw_runs:
-                raise ValueError("At least one of query, sparse_vector, or dense_vector must be provided")
+                logger.warning(f"query:{query}, At least one of query, sparse_vector, or dense_vector must be provided")
+                return []
 
             start_time = time.time()
             fused_results = self.manual_rrf(raw_runs, k=size, weights=[keyword_w, sparse_w, dense_w])
@@ -429,6 +438,79 @@ class ESClient:
         
         sorted_docs = sorted(doc_scores.items(), key=lambda x: x[1], reverse=True)
         return sorted_docs[:k]
+
+    def get_related_tables(
+        self,
+        db_name: str,
+        table_name: str,
+        max_depth: int = 3,
+    ) -> List[Dict[str, Any]]:
+        query = {
+            "size": 100,
+            "query": {
+                "bool": {
+                    "filter": [
+                        {"term": {"db_name": db_name}},
+                        {"term": {"table_name": table_name}}
+                    ]
+                }
+            }
+        }
+        response = self.client.search(index=self.index, body=query)
+        hits = response.get("hits", {}).get("hits", [])
+
+        if not hits:
+            logger.warning(f"Table {db_name}.{table_name} not found in index")
+            return []
+
+        source = hits[0]["_source"]
+        related_tables_map: Dict[str, Any] = {
+            table_name: source
+        }
+
+        tables_to_check = [
+            rt.get("table_name", "") for rt in source.get("related_tables", [])
+            if rt.get("table_name")
+        ]
+        checked_tables = {table_name}
+
+        depth = 0
+        while tables_to_check and depth < max_depth:
+            depth += 1
+            next_tables_to_check = []
+
+            for related_table in tables_to_check:
+                if related_table in checked_tables:
+                    continue
+
+                query = {
+                    "size": 10,
+                    "query": {
+                        "bool": {
+                            "filter": [
+                                {"term": {"db_name": db_name}},
+                                {"term": {"table_name": related_table}}
+                            ]
+                        }
+                    }
+                }
+                response = self.client.search(index=self.index, body=query)
+                related_hits = response.get("hits", {}).get("hits", [])
+
+                for hit in related_hits:
+                    hit_source = hit["_source"]
+                    t_name = hit_source.get("table_name", "")
+                    if t_name and t_name not in checked_tables:
+                        related_tables_map[t_name] = hit_source
+                        checked_tables.add(t_name)
+                        next_tables_to_check.extend(
+                            rt.get("table_name", "") for rt in hit_source.get("related_tables", [])
+                            if rt.get("table_name") and rt.get("table_name") not in checked_tables
+                        )
+
+            tables_to_check = list(set(next_tables_to_check))
+
+        return list(related_tables_map.values())
 
 
 es_client = ESClient()

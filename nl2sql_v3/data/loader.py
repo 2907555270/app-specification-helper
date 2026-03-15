@@ -7,25 +7,49 @@ from typing import Dict, Generator, List, Optional
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from nl2sql_v3.client.api_client import dense_vector_client, sparse_vector_client
+from nl2sql_v3.client.api_client import dense_vector_client, sparse_vector_client, bge3_client
 from nl2sql_v3.config import config
-from nl2sql_v3.recall.base import QueryRecord, TableInfo
+from nl2sql_v3.recall.base import QueryRecord
+from nl2sql_v3.models.table_info import TableInfo, ColumnInfo
+from nl2sql_v3.scripts.extract_tables import load_structured_tables
 
 logger = logging.getLogger(__name__)
 
 
 class MetadataLoader:
-    def __init__(self, metadata_path: Optional[str] = None):
+    def __init__(self, metadata_path: Optional[str] = None, use_structured: Optional[bool] = None):
+        if use_structured is None:
+            use_structured = config.data.use_tables_structured
+
         if metadata_path:
             self.metadata_path = Path(metadata_path)
+        elif use_structured:
+            self.metadata_path = config.data.get_tables_structured_path()
         else:
             self.metadata_path = config.data.get_metadata_path()
+        self.use_structured = use_structured
         self._tables: Optional[List[TableInfo]] = None
 
     def load(self) -> List[TableInfo]:
         if self._tables is not None:
             return self._tables
 
+        if self.use_structured:
+            self._tables = self._load_structured()
+        else:
+            self._tables = self._load_legacy()
+
+        logger.info(f"Loaded {len(self._tables)} tables from metadata")
+        return self._tables
+
+    def _load_structured(self) -> List[TableInfo]:
+        if not self.metadata_path.exists():
+            raise FileNotFoundError(f"Structured metadata file not found: {self.metadata_path}")
+
+        tables = load_structured_tables(str(self.metadata_path))
+        return tables
+
+    def _load_legacy(self) -> List[TableInfo]:
         if not self.metadata_path.exists():
             raise FileNotFoundError(f"Metadata file not found: {self.metadata_path}")
 
@@ -40,14 +64,21 @@ class MetadataLoader:
 
             db_name = parts[0].strip()
             table_name = parts[1].strip()
-            columns = [col.strip() for col in parts[2:] if col.strip()]
+            column_names = [col.strip() for col in parts[2:] if col.strip()]
+
+            columns = [
+                ColumnInfo(name=col_name, name_cn="", type="text")
+                for col_name in column_names
+            ]
 
             tables.append(
-                TableInfo(db_name=db_name, table_name=table_name, columns=columns)
+                TableInfo(
+                    db_name=db_name,
+                    table_name=table_name,
+                    columns=columns,
+                )
             )
 
-        self._tables = tables
-        logger.info(f"Loaded {len(tables)} tables from metadata")
         return tables
 
     def get_table(self, db_name: str, table_name: str) -> Optional[TableInfo]:
@@ -103,32 +134,51 @@ def build_index_documents(
     tables: List[TableInfo],
     use_sparse: bool = True,
     use_dense: bool = True,
+    use_bge3: bool = True,
 ) -> List[Dict]:
     documents = []
     for table in tables:
-        doc = {
-            "db_name": table.db_name,
-            "table_name": table.table_name,
-            "all_names": f"{table.db_name} {table.table_name} {' '.join(table.columns)}",
-        }
+        doc = table.to_es_doc()
 
-        if use_sparse:
+        all_names = doc["all_names"]
+
+        if use_bge3 and (use_sparse or use_dense):
             try:
-                sparse_result = sparse_vector_client.encode(
-                    doc["all_names"], query_mode=False
+                bge_result = bge3_client.encode(
+                    all_names,
+                    dense_output=use_dense,
+                    sparse_output=use_sparse,
                 )
-                doc["sparse_vector"] = sparse_result.get("sparse_id_vector", {})
+                if use_dense:
+                    dense_vecs = bge_result.get("dense_vecs", [])
+                    doc["dense_vector"] = dense_vecs[0] if dense_vecs else []
+                if use_sparse:
+                    sparse_vecs = bge_result.get("sparse_vecs", [])
+                    doc["sparse_vector"] = sparse_vecs[0] if sparse_vecs else {}
             except Exception as e:
-                logger.warning(f"Failed to generate sparse vector for {table.table_name}: {e}")
-                doc["sparse_vector"] = {}
+                logger.warning(f"Failed to generate vectors for {table.table_name}: {e}")
+                if use_dense:
+                    doc["dense_vector"] = []
+                if use_sparse:
+                    doc["sparse_vector"] = {}
+        else:
+            if use_sparse:
+                try:
+                    sparse_result = sparse_vector_client.encode(
+                        all_names, query_mode=False
+                    )
+                    doc["sparse_vector"] = sparse_result.get("sparse_id_vector", {})
+                except Exception as e:
+                    logger.warning(f"Failed to generate sparse vector for {table.table_name}: {e}")
+                    doc["sparse_vector"] = {}
 
-        if use_dense:
-            try:
-                dense_result = dense_vector_client.encode(doc["all_names"])
-                doc["dense_vector"] = dense_result
-            except Exception as e:
-                logger.warning(f"Failed to generate dense vector for {table.table_name}: {e}")
-                doc["dense_vector"] = []
+            if use_dense:
+                try:
+                    dense_result = dense_vector_client.encode(all_names)
+                    doc["dense_vector"] = dense_result
+                except Exception as e:
+                    logger.warning(f"Failed to generate dense vector for {table.table_name}: {e}")
+                    doc["dense_vector"] = []
 
         documents.append(doc)
 
@@ -139,30 +189,50 @@ def stream_build_index_documents(
     tables: List[TableInfo],
     use_sparse: bool = True,
     use_dense: bool = True,
+    use_bge3: bool = True,
 ) -> Generator[Dict, None, None]:
     for table in tables:
-        doc = {
-            "db_name": table.db_name,
-            "table_name": table.table_name,
-            "all_names": f"{table.db_name} {table.table_name} {' '.join(table.columns)}",
-        }
-        if use_sparse:
-            try:
-                sparse_result = sparse_vector_client.encode(
-                    doc["all_names"], query_mode=False
-                )
-                doc["sparse_vector"] = sparse_result.get("sparse_id_vector", {})
-            except Exception as e:
-                logger.warning(f"Failed to generate sparse vector for {table.table_name}: {e}")
-                doc["sparse_vector"] = {}
+        doc = table.to_es_doc()
 
-        if use_dense:
+        all_names = doc["all_names"]
+
+        if use_bge3 and (use_sparse or use_dense):
             try:
-                dense_result = dense_vector_client.encode(doc["all_names"])
-                doc["dense_vector"] = dense_result
+                bge_result = bge3_client.encode(
+                    all_names,
+                    dense_output=use_dense,
+                    sparse_output=use_sparse,
+                )
+                if use_dense:
+                    dense_vecs = bge_result.get("dense_vecs", [])
+                    doc["dense_vector"] = dense_vecs[0] if dense_vecs else []
+                if use_sparse:
+                    sparse_vecs = bge_result.get("sparse_vecs", [])
+                    doc["sparse_vector"] = sparse_vecs[0] if sparse_vecs else {}
             except Exception as e:
-                logger.warning(f"Failed to generate dense vector for {table.table_name}: {e}")
-                doc["dense_vector"] = []
+                logger.warning(f"Failed to generate vectors for {table.table_name}: {e}")
+                if use_dense:
+                    doc["dense_vector"] = []
+                if use_sparse:
+                    doc["sparse_vector"] = {}
+        else:
+            if use_sparse:
+                try:
+                    sparse_result = sparse_vector_client.encode(
+                        all_names, query_mode=False
+                    )
+                    doc["sparse_vector"] = sparse_result.get("sparse_id_vector", {})
+                except Exception as e:
+                    logger.warning(f"Failed to generate sparse vector for {table.table_name}: {e}")
+                    doc["sparse_vector"] = {}
+
+            if use_dense:
+                try:
+                    dense_result = dense_vector_client.encode(all_names)
+                    doc["dense_vector"] = dense_result
+                except Exception as e:
+                    logger.warning(f"Failed to generate dense vector for {table.table_name}: {e}")
+                    doc["dense_vector"] = []
 
         yield doc
 

@@ -71,6 +71,52 @@ class DenseVectorClient(APIClient):
         return result.get("dense_vector", [])
 
 
+class BGE3Client(APIClient):
+    def __init__(self):
+        super().__init__()
+        self.url = config.services.bge_m3.url
+
+    def encode(
+        self,
+        text: str,
+        batch_size: int = 32,
+        max_length: int = 512,
+        dense_output: bool = True,
+        sparse_output: bool = True,
+        colbert_output: bool = False,
+    ) -> Dict[str, Any]:
+        json_data = {
+            "text": text,
+            "batch_size": batch_size,
+            "max_length": max_length,
+            "dense_output": dense_output,
+            "sparse_output": sparse_output,
+            "colbert_output": colbert_output,
+        }
+        result = self._post(self.url, json_data=json_data)
+        return result
+
+    def encode_batch(
+        self,
+        texts: List[str],
+        batch_size: int = 32,
+        max_length: int = 512,
+        dense_output: bool = True,
+        sparse_output: bool = True,
+        colbert_output: bool = False,
+    ) -> Dict[str, Any]:
+        json_data = {
+            "text": texts,
+            "batch_size": batch_size,
+            "max_length": max_length,
+            "dense_output": dense_output,
+            "sparse_output": sparse_output,
+            "colbert_output": colbert_output,
+        }
+        result = self._post(self.url, json_data=json_data)
+        return result
+
+
 class TranslateClient(APIClient):
     def __init__(self):
         super().__init__()
@@ -145,6 +191,7 @@ class RerankClient(APIClient):
 
 sparse_vector_client = SparseVectorClient()
 dense_vector_client = DenseVectorClient()
+bge3_client = BGE3Client()
 translate_client = TranslateClient()
 llm_client = LLMClient()
 rerank_client = RerankClient()

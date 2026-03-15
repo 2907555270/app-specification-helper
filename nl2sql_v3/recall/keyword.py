@@ -6,9 +6,10 @@ from typing import List, Optional
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from nl2sql_v3.recall.base import RecallResult, TableInfo
+from nl2sql_v3.recall.base import RecallResult
 from nl2sql_v3.client.es_client import es_client
 from nl2sql_v3.config import config
+from nl2sql_v3.models.table_info import TableInfo
 
 logger = logging.getLogger(__name__)
 

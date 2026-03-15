@@ -1,6 +1,8 @@
 # nl2sql_v3 Configuration
 
 services:
+  bge_m3:
+    url: "http://127.0.0.1:8000/api/v1/bge/encode"
   sparse_vector:
     url: "http://127.0.0.1:8000/api/v1/sparse_vector"
   dense_vector:
@@ -13,7 +15,8 @@ services:
   elasticsearch:
     hosts:
       - "http://192.168.116.5:9200"
-    index: "tables-metadata"
+    index: "nl2sql-tables-metadata"
+    dense_dim: 1024
 
   llm:
     base_url: "https://openrouter.ai/api/v1"
@@ -40,7 +43,10 @@ recall:
 
 data:
   metadata: "../data/metadatas.json"
-  queries: "../data/query_and_tables.json"
+  queries: "../data/test_query_and_tables.json"
+  use_tables_structured: true
+  tables: "../data/test_tables.json"
+  tables_structured: "../data/test_tables_structured.json"
 
 logging:
   level: "INFO"

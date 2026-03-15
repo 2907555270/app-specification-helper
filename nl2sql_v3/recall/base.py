@@ -1,12 +1,6 @@
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
-
-
-class TableInfo(BaseModel):
-    db_name: str
-    table_name: str
-    columns: List[str] = []
 
 
 class RecallResult(BaseModel):

@@ -7,9 +7,9 @@ from typing import Dict, List, Optional
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from nl2sql_v3.config import config
-from nl2sql_v3.recall.base import RecallResult, TableInfo
+from nl2sql_v3.recall.base import RecallResult
 from nl2sql_v3.client.es_client import es_client
-from nl2sql_v3.client.api_client import sparse_vector_client, dense_vector_client, rerank_client
+from nl2sql_v3.client.api_client import sparse_vector_client, dense_vector_client, rerank_client, bge3_client
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +24,7 @@ class HybridRetriever:
         use_dense: bool = True,
         use_rrf: Optional[bool] = None,
         use_rerank: Optional[bool] = None,
+        use_bge3: bool = True,
     ):
         self.weights = weights or {
             "keyword": config.recall.weights.keyword,
@@ -34,8 +35,9 @@ class HybridRetriever:
         self.use_keyword = use_keyword
         self.use_sparse = use_sparse
         self.use_dense = use_dense
-        self.use_rrf = use_rrf if use_rrf is not None else config.recall.use_rrf
+        self.use_rrf = use_rrf if use_rrf is not None else config.recall.rrf_enabled
         self.use_rerank = use_rerank if use_rerank is not None else config.recall.rerank_enabled
+        self.use_bge3 = use_bge3
         self.rerank_top_k = config.recall.rerank_top_k
         self.rerank_threshold = config.recall.rerank_threshold
         self.hybrid_search_top_k = config.recall.hybrid_search_top_k
@@ -48,18 +50,34 @@ class HybridRetriever:
         sparse_vector = None
         dense_vector = None
 
-        if self.use_sparse:
+        if self.use_bge3 and (self.use_sparse or self.use_dense):
             try:
-                sparse_result = sparse_vector_client.encode(query, query_mode=True)
-                sparse_vector = sparse_result.get("sparse_id_vector", {})
+                bge_result = bge3_client.encode(
+                    query,
+                    dense_output=self.use_dense,
+                    sparse_output=self.use_sparse,
+                )
+                if self.use_dense:
+                    dense_vecs = bge_result.get("dense_vecs", [])
+                    dense_vector = dense_vecs[0] if dense_vecs else None
+                if self.use_sparse:
+                    sparse_vecs = bge_result.get("sparse_vecs", [])
+                    sparse_vector = sparse_vecs[0] if sparse_vecs else None
             except Exception as e:
-                logger.warning(f"Sparse vector encoding failed: {e}")
+                logger.warning(f"BGE3 encoding failed: {e}")
+        else:
+            if self.use_sparse:
+                try:
+                    sparse_result = sparse_vector_client.encode(query, query_mode=True)
+                    sparse_vector = sparse_result.get("sparse_id_vector", {})
+                except Exception as e:
+                    logger.warning(f"Sparse vector encoding failed: {e}")
 
-        if self.use_dense:
-            try:
-                dense_vector = dense_vector_client.encode(query)
-            except Exception as e:
-                logger.warning(f"Dense vector encoding failed: {e}")
+            if self.use_dense:
+                try:
+                    dense_vector = dense_vector_client.encode(query)
+                except Exception as e:
+                    logger.warning(f"Dense vector encoding failed: {e}")
 
         try:
             results = es_client.hybrid_search(

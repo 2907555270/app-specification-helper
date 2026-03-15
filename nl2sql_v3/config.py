@@ -17,6 +17,10 @@ class DenseVectorConfig(BaseModel):
     url: str = "http://127.0.0.1:8000/api/v1/dense_vector"
 
 
+class BGE3Config(BaseModel):
+    url: str = "http://127.0.0.1:8000/api/v1/bge/encode"
+
+
 class TranslateConfig(BaseModel):
     url: str = "http://127.0.0.1:8000/api/v1/translate"
 
@@ -28,6 +32,7 @@ class RerankConfig(BaseModel):
 class ElasticsearchConfig(BaseModel):
     hosts: List[str] = ["http://192.168.116.5:9200"]
     index: str = "tables-metadata"
+    dense_dim: int = 1024
 
 
 class LLMConfig(BaseModel):
@@ -37,6 +42,7 @@ class LLMConfig(BaseModel):
 
 
 class ServicesConfig(BaseModel):
+    bge_m3: BGE3Config = BGE3Config()
     sparse_vector: SparseVectorConfig = SparseVectorConfig()
     dense_vector: DenseVectorConfig = DenseVectorConfig()
     translate: TranslateConfig = TranslateConfig()
@@ -66,12 +72,24 @@ class RecallConfig(BaseModel):
 class DataConfig(BaseModel):
     metadata: str = "data/metadatas.json"
     queries: str = "data/query_and_tables.json"
+    use_tables_structured: bool = False
+    tables: str = "data/tables.json"
+    tables_structured: str = "data/tables_structured.json"
 
     def get_metadata_path(self, config_file: Path = None) -> Path:
         if config_file is None:
             config_file = Path(__file__).parent / "config.yaml"
         config_dir = config_file.parent
         path = Path(self.metadata)
+        if path.is_absolute():
+            return path
+        return config_dir / path
+
+    def get_tables_structured_path(self, config_file: Path = None) -> Path:
+        if config_file is None:
+            config_file = Path(__file__).parent / "config.yaml"
+        config_dir = config_file.parent
+        path = Path(self.tables_structured)
         if path.is_absolute():
             return path
         return config_dir / path
