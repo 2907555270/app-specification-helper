@@ -69,6 +69,7 @@ class HybridRetriever:
                 dense_weight=self.weights.get("dense"),
                 size=self.hybrid_search_top_k,
                 filter_db_name=filter_db_name,
+                use_rrf=True,
             )
         except Exception as e:
             logger.error(f"Hybrid search failed: {e}")

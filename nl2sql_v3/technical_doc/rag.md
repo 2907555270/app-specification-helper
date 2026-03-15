@@ -148,7 +148,7 @@ Cross-Encoder 能精细处理以下情况：
 **硬件要求**：RTX 4060 可本地运行 ColBERT（压缩版约 1-2GB VRAM）
 
 ---
-
+# RRF
 **RRF（Reciprocal Rank Fusion，互逆排名融合）** 是目前信息检索和混合搜索（hybrid search）中最常用、最鲁棒的融合方法之一，尤其在结合多种召回方式（BM25、sparse、dense、knn 等）时，效果往往比手动加权分数更好。
 
 下面用通俗的方式完整介绍一下它的原理、为什么好用、计算公式，以及在 NL2SQL 场景中的实际意义。
