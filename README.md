@@ -1,6 +1,8 @@
 # App Specification Helper
 
-AI 驱动的应用规格说明书生成与项目初始化工具
+> AI 驱动的应用规格说明书生成与项目初始化工具
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## 概述
 
@@ -33,7 +35,7 @@ AI 驱动的应用规格说明书生成与项目初始化工具
 
 ### 2. 模板生成
 
-根据收集的信息，自动生成以下文档：
+根据收集的信息，自动生成以下文档模板：
 
 | 模板文件 | 说明 |
 |---------|------|
