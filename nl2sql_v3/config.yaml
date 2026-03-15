@@ -25,6 +25,8 @@ recall:
     keyword: 0.1
     sparse: 0.6
     dense: 0.3
+  # rrf 相关配置  
+  rrf_enabled: true
   # 召回器的最终返回结果
   top_k: 20
   keyword_threshold: 0.0

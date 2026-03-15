@@ -8,7 +8,6 @@ from collections import defaultdict
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from elasticsearch import Elasticsearch
-from ranx import Run
 
 from nl2sql_v3.config import config
 
@@ -194,45 +193,49 @@ class ESClient:
             base_filter.append({"term": {"db_name": filter_db_name}})
 
         if use_rrf:
-            runs_list: List[Run] = []
-
             start_time = time.time()
+            
+            raw_runs: List[Dict[str, float]] = []
+
             if query:
+                start_es = time.time()
                 keyword_results = self.keyword_search(query, size=size, filter_db_name=filter_db_name)
+                logger.debug(f"keyword search took {time.time()-start_es:.2f}s, hits={len(keyword_results)}")
                 if keyword_results:
-                    keyword_run_dict = {"q1": {}}
-                    for i, doc in enumerate(keyword_results):
+                    keyword_run_dict: Dict[str, float] = {}
+                    for doc in keyword_results:
                         doc_id = f"{doc.get('db_name', '')}_{doc.get('table_name', '')}"
-                        keyword_run_dict["q1"][doc_id] = doc.get("_score", 0.0) * keyword_w
-                    runs_list.append(Run(keyword_run_dict))
+                        keyword_run_dict[doc_id] = doc.get("_score", 0.0) * keyword_w
+                    raw_runs.append(keyword_run_dict)
 
             if sparse_vector:
+                start_es = time.time()
                 sparse_results = self.sparse_search(sparse_vector, size=size, filter_db_name=filter_db_name)
+                logger.debug(f"sparse  search took {time.time()-start_es:.2f}s, hits={len(sparse_results)}")
                 if sparse_results:
-                    sparse_run_dict = {"q1": {}}
-                    for i, doc in enumerate(sparse_results):
+                    sparse_run_dict: Dict[str, float] = {}
+                    for doc in sparse_results:
                         doc_id = f"{doc.get('db_name', '')}_{doc.get('table_name', '')}"
-                        sparse_run_dict["q1"][doc_id] = doc.get("_score", 0.0) * sparse_w
-                    runs_list.append(Run(sparse_run_dict))
+                        sparse_run_dict[doc_id] = doc.get("_score", 0.0) * sparse_w
+                    raw_runs.append(sparse_run_dict)
 
             if dense_vector:
+                start_es = time.time()
                 dense_results = self.dense_search(dense_vector, size=size, filter_db_name=filter_db_name)
+                logger.debug(f"dense   search took {time.time()-start_es:.2f}s, hits={len(dense_results)}")
                 if dense_results:
-                    dense_run_dict = {"q1": {}}
-                    for i, doc in enumerate(dense_results):
+                    dense_run_dict: Dict[str, float] = {}
+                    for doc in dense_results:
                         doc_id = f"{doc.get('db_name', '')}_{doc.get('table_name', '')}"
-                        dense_run_dict["q1"][doc_id] = doc.get("_score", 0.0) * dense_w
-                    runs_list.append(Run(dense_run_dict))
+                        dense_run_dict[doc_id] = doc.get("_score", 0.0) * dense_w
+                    raw_runs.append(dense_run_dict)
 
-            if not runs_list:
+            if not raw_runs:
                 raise ValueError("At least one of query, sparse_vector, or dense_vector must be provided")
-            logger.info(f"RRF runs list prepare, include es search time: {time.time() - start_time}")
 
             start_time = time.time()
-            raw_runs = [run.run["q1"] for run in runs_list]
-            logger.info(f"RRF raw runs count: {[len(r) for r in raw_runs]}")
             fused_results = self.manual_rrf(raw_runs, k=60)
-            logger.info(f"RRF fused search time: {time.time() - start_time}")
+            logger.debug(f"RRF fused search time: {time.time() - start_time}")
 
             doc_id_to_data = {}
             all_results = []
@@ -251,7 +254,7 @@ class ESClient:
             for doc_id, score in fused_results:
                 if doc_id in doc_id_to_data:
                     doc = doc_id_to_data[doc_id]
-                    final_results.append({"rrf_score": score, **doc})
+                    final_results.append({"_score": score, **doc})
 
             return final_results
 
@@ -327,6 +330,7 @@ class ESClient:
             }
         }
 
+        logger.info(f"filter_db_name: {filter_db_name}")
         if filter_db_name:
             body["query"] = {
                 "bool": {
@@ -335,6 +339,7 @@ class ESClient:
                 }
             }
 
+        logger.debug(f"keyword query body: {body}")
         response = self.client.search(index=self.index, body=body)
         hits = response.get("hits", {}).get("hits", [])
         return [{"_score": hit["_score"], **hit["_source"]} for hit in hits]
@@ -355,6 +360,7 @@ class ESClient:
             }
         }
 
+        logger.info(f"filter_db_name: {filter_db_name}")
         if filter_db_name:
             body["query"] = {
                 "bool": {
@@ -363,6 +369,7 @@ class ESClient:
                 }
             }
 
+        logger.debug(f"sparse query body: {body}")
         response = self.client.search(index=self.index, body=body)
         hits = response.get("hits", {}).get("hits", [])
         return [{"_score": hit["_score"], **hit["_source"]} for hit in hits]
@@ -383,6 +390,7 @@ class ESClient:
             }
         }
 
+        logger.info(f"filter_db_name: {filter_db_name}")
         if filter_db_name:
             body["query"] = {
                 "bool": {
@@ -390,6 +398,7 @@ class ESClient:
                 }
             }
 
+        logger.debug(f"dense query body: {body}")
         response = self.client.search(index=self.index, body=body)
         hits = response.get("hits", {}).get("hits", [])
         return [{"_score": hit["_score"], **hit["_source"]} for hit in hits]
@@ -405,7 +414,7 @@ class ESClient:
     def get_stats(self) -> Dict[str, Any]:
         return self.client.indices.stats(index=self.index)
     
-    def manual_rrf(all_runs: List[Dict[str, float]], k: int = 60) -> List[tuple]:
+    def manual_rrf(self, all_runs: List[Dict[str, float]], k: int = 60) -> List[tuple]:
         doc_scores: Dict[str, float] = {}
         for run_dict in all_runs:
             if not run_dict:

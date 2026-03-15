@@ -56,6 +56,7 @@ class RecallConfig(BaseModel):
     top_k: int = 5
     keyword_threshold: float = 0.0
     similarity_threshold: float = 0.7
+    rrf_enabled: bool = False
     rerank_enabled: bool = False
     rerank_top_k: int = 10
     rerank_threshold: float = -float("inf")

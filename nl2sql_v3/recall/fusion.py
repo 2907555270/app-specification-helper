@@ -22,7 +22,8 @@ class HybridRetriever:
         use_keyword: bool = True,
         use_sparse: bool = True,
         use_dense: bool = True,
-        use_rerank: Optional[bool] = True,
+        use_rrf: Optional[bool] = None,
+        use_rerank: Optional[bool] = None,
     ):
         self.weights = weights or {
             "keyword": config.recall.weights.keyword,
@@ -33,6 +34,7 @@ class HybridRetriever:
         self.use_keyword = use_keyword
         self.use_sparse = use_sparse
         self.use_dense = use_dense
+        self.use_rrf = use_rrf if use_rrf is not None else config.recall.use_rrf
         self.use_rerank = use_rerank if use_rerank is not None else config.recall.rerank_enabled
         self.rerank_top_k = config.recall.rerank_top_k
         self.rerank_threshold = config.recall.rerank_threshold
@@ -69,10 +71,10 @@ class HybridRetriever:
                 dense_weight=self.weights.get("dense"),
                 size=self.hybrid_search_top_k,
                 filter_db_name=filter_db_name,
-                use_rrf=True,
+                use_rrf=self.use_rrf,
             )
         except Exception as e:
-            logger.error(f"Hybrid search failed: {e.with_traceback(e.__traceback__)}")
+            logger.error(f"Hybrid search failed: {e.with_traceback()}")
             return []
 
         recall_results = []

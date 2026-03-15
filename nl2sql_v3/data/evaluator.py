@@ -23,12 +23,14 @@ class Evaluator:
         use_sparse: bool = True,
         use_dense: bool = True,
         weights: Optional[dict] = None,
+        use_rrf: Optional[bool] = None,
         use_rerank: Optional[bool] = None,
     ):
         self.use_keyword = use_keyword
         self.use_sparse = use_sparse
         self.use_dense = use_dense
         self.weights = weights
+        self.use_rrf = use_rrf if use_rrf is not None else config.recall.rrf_enabled
         self.use_rerank = use_rerank if use_rerank is not None else config.recall.rerank_enabled
         self.query_loader = QueryLoader()
 
@@ -40,7 +42,7 @@ class Evaluator:
         if top_k_values is None:
             top_k_values = [1, 3, 5]
 
-        queries = self.query_loader.load()[:5]
+        queries = self.query_loader.load()
         start_time = time.time()
 
         if not queries:
@@ -104,6 +106,7 @@ class Evaluator:
             use_sparse=self.use_sparse,
             use_dense=self.use_dense,
             use_rerank=self.use_rerank,
+            use_rrf = self.use_rrf,
         )
 
         results = retriever.retrieve(query.question, filter_db_name=query.db_name if filter_db else None)
