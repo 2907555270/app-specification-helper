@@ -16,7 +16,7 @@ class RecallResult(BaseModel):
     score: float
     match_type: str
     rerank_score: float
-
+    rrf_score: float
 
 class TableMatch(BaseModel):
     db_name: str

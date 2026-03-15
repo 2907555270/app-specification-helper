@@ -84,6 +84,7 @@ class HybridRetriever:
                     all_names=doc.get("all_names", ""),
                     score=doc.get("_score", 0.0),
                     rerank_score=-float("inf"),
+                    rrf_score=doc.get("rrf_score", 0.0),
                     match_type="hybrid",
                 )
             )

@@ -8,7 +8,7 @@ from collections import defaultdict
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from elasticsearch import Elasticsearch
-from ranx import Run, fuse
+from ranx import Run
 
 from nl2sql_v3.config import config
 
@@ -196,6 +196,7 @@ class ESClient:
         if use_rrf:
             runs_list: List[Run] = []
 
+            start_time = time.time()
             if query:
                 keyword_results = self.keyword_search(query, size=size, filter_db_name=filter_db_name)
                 if keyword_results:
@@ -220,29 +221,16 @@ class ESClient:
                     dense_run_dict = {"q1": {}}
                     for i, doc in enumerate(dense_results):
                         doc_id = f"{doc.get('db_name', '')}_{doc.get('table_name', '')}"
-                        dense_run_dict["q1"][doc_id] = doc.get("_score", 0.0) * dense_w
+                        dense_run_dict["q1"][doc_id] = doc.get("rrf_score", 0.0) * dense_w
                     runs_list.append(Run(dense_run_dict))
 
             if not runs_list:
                 raise ValueError("At least one of query, sparse_vector, or dense_vector must be provided")
+            logger.info(f"RRF runs list prepare, include es search time: {time.time() - start_time}")
 
             start_time = time.time()
-            fused_results = self.manual_rrf(all_runs = runs_list, k = size)
-            # fused_run = fuse(
-            #     runs=runs_list,
-            #     method="rrf",
-            # )
-
-            # fused_scores = fused_run.run["q1"]  # dict {doc_id: fused_score}
-            # if len(fused_scores) == 0:
-            #     return []
-            # # 按分数降序排序，取前 size 个
-            # logger.info(f"RRF fused scores: {len(fused_scores)}")
-            # fused_results = sorted(
-            #     fused_scores.items(),
-            #     key=lambda x: x[1],   # 按 value (score) 排序
-            #     reverse=True
-            # )[:size]
+            raw_runs = [run.run["q1"] for run in runs_list]
+            fused_results = self.manual_rrf(raw_runs, k=60)
             logger.info(f"RRF fused search time: {time.time() - start_time}")
 
             doc_id_to_data = {}
@@ -262,7 +250,7 @@ class ESClient:
             for doc_id, score in fused_results:
                 if doc_id in doc_id_to_data:
                     doc = doc_id_to_data[doc_id]
-                    final_results.append({"_score": score, **doc})
+                    final_results.append({"rrf_score": score, **doc})
 
             return final_results
 
@@ -416,14 +404,22 @@ class ESClient:
     def get_stats(self) -> Dict[str, Any]:
         return self.client.indices.stats(index=self.index)
     
-    def manual_rrf(all_runs, k=60):
-        doc_scores = defaultdict(float)
-        for run_dict in all_runs:  # all_runs = [keyword_run_dict["q1"], sparse_run_dict["q1"], dense_run_dict["q1"]]
-            for rank, (doc_id, _) in enumerate(sorted(run_dict.items(), key=lambda x: x[1], reverse=True), 1):
-                doc_scores[doc_id] += 1 / (k + rank)
-        # 排序取 Top
-        sorted_docs = sorted(doc_scores.items(), key=lambda x: x[1], reverse=True)[:size]
-        return sorted_docs  # [(doc_id, score), ...]
+    def manual_rrf(all_runs: List[Dict[str, float]], k: int = 60) -> List[tuple]:
+        doc_scores: Dict[str, float] = {}
+        for run_dict in all_runs:
+            if not run_dict:
+                continue
+            sorted_items = sorted(run_dict.items(), key=lambda x: x[1], reverse=True)
+            for rank, (doc_id, score) in enumerate(sorted_items, 1):
+                if doc_id not in doc_scores:
+                    doc_scores[doc_id] = 0.0
+                doc_scores[doc_id] += 1.0 / (k + rank)
+        
+        if not doc_scores:
+            return []
+        
+        sorted_docs = sorted(doc_scores.items(), key=lambda x: x[1], reverse=True)
+        return sorted_docs
 
 
 es_client = ESClient()
