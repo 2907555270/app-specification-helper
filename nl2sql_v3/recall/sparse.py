@@ -45,10 +45,12 @@ class SparseRecaller:
                 )
 
             if recall_results:
-                max_score = max(r.score for r in recall_results)
-                if max_score > 0:
-                    for r in recall_results:
-                        r.score = r.score / max_score
+                scores = [r.score for r in recall_results if r.score]
+                if scores:
+                    max_score = max(scores)
+                    if max_score > 0:
+                        for r in recall_results:
+                            r.score = r.score / max_score
 
             return recall_results
 

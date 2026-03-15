@@ -3,6 +3,7 @@ import os
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+import operator
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -226,8 +227,14 @@ class ESClient:
                 runs=runs_list,
                 method="rrf",
             )
-
-            fused_results = fused_run.get_top_n(n=size, query_id="q1")
+            
+            fused_scores = fused_run.run["q1"]  # dict {doc_id: fused_score}
+            # 按分数降序排序，取前 size 个
+            fused_results = sorted(
+                fused_scores.items(),
+                key=lambda x: x[1],   # 按 value (score) 排序
+                reverse=True
+            )[:size]
 
             doc_id_to_data = {}
             all_results = []
@@ -246,7 +253,7 @@ class ESClient:
             for doc_id, score in fused_results:
                 if doc_id in doc_id_to_data:
                     doc = doc_id_to_data[doc_id]
-                    final_results.append({"_score": score, **doc})
+                    final_results.append({"rrf_score": score, **doc})
 
             return final_results
 
