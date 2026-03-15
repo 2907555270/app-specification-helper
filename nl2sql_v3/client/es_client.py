@@ -225,7 +225,6 @@ class ESClient:
             fused_run = fuse(
                 runs=runs_list,
                 method="rrf",
-                k=60,
             )
 
             fused_results = fused_run.get_top_n(n=size, query_id="q1")
@@ -317,7 +316,7 @@ class ESClient:
             "query": {
                 "multi_match": {
                     "query": query,
-                    "fields": ["all_names", "table_name"],
+                    "fields": ["all_names"],
                     "type": "best_fields",
                 }
             }
@@ -326,7 +325,7 @@ class ESClient:
         if filter_db_name:
             body["query"] = {
                 "bool": {
-                    "must": {"multi_match": {"query": query, "fields": ["all_names", "table_name"], "type": "best_fields"}},
+                    "must": {"multi_match": {"query": query, "fields": ["all_names"], "type": "best_fields"}},
                     "filter": [{"term": {"db_name": filter_db_name}}]
                 }
             }

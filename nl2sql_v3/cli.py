@@ -83,11 +83,7 @@ def recall(
             "dense": weight_list[2],
         }
 
-        loader = MetadataLoader()
-        tables = loader.load()
-
         retriever = HybridRetriever(
-            tables=tables,
             weights=weights_dict,
             top_k=top_k,
             use_keyword=not no_keyword,
