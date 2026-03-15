@@ -49,8 +49,7 @@ def keyword_recall(
                     )
                 )
 
-    results.sort(key=lambda x: x.score, reverse=True)
-    return results[:top_k]
+    return results
 
 
 class KeywordRecaller:

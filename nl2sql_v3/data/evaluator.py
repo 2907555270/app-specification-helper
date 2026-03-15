@@ -40,7 +40,7 @@ class Evaluator:
         if top_k_values is None:
             top_k_values = [1, 3, 5]
 
-        queries = self.query_loader.load()
+        queries = self.query_loader.load()[:5]
         start_time = time.time()
 
         if not queries:

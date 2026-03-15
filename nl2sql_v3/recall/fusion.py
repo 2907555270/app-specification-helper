@@ -72,7 +72,7 @@ class HybridRetriever:
                 use_rrf=True,
             )
         except Exception as e:
-            logger.error(f"Hybrid search failed: {e}")
+            logger.error(f"Hybrid search failed: {e.__cause__}")
             return []
 
         recall_results = []
