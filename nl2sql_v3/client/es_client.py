@@ -181,61 +181,124 @@ class ESClient:
         dense_weight: Optional[float] = None,
         size: int = 10,
         filter_db_name: Optional[str] = None,
+        use_rrf: bool = True,
     ) -> List[Dict[str, Any]]:
         keyword_w = keyword_weight if keyword_weight is not None else config.recall.weights.keyword
         sparse_w = sparse_weight if sparse_weight is not None else config.recall.weights.sparse
         dense_w = dense_weight if dense_weight is not None else config.recall.weights.dense
-        
-        should: List[Dict[str, Any]] = []
-        knn_list: List[Dict[str, Any]] = []
 
-        if query:
-            should.append({
-                "multi_match": {
-                    "query": query,
-                    "fields": ["all_names"],
-                    "type": "best_fields",
-                    "boost": keyword_w,
-                }
-            })
-
-        if sparse_vector:
-            should.append({
-                "sparse_vector": {
-                    "field": "sparse_vector",
-                    "query_vector": sparse_vector,
-                    "boost": sparse_w,
-                }
-            })
-
-        if dense_vector:
-            knn_list.append({
-                "field": "dense_vector",
-                "query_vector": dense_vector,
-                "k": size,
-                "similarity": 0.7,
-                "boost": dense_w,
-            })
-
-        if not should and not knn_list:
-            raise ValueError("At least one of query, sparse_vector, or dense_vector must be provided")
-
-        body: Dict[str, Any] = {"size": size}
-        
-        bool_query: Dict[str, Any] = {}
-        
-        if should:
-            bool_query["should"] = should
-            bool_query["minimum_should_match"] = 1 if len(should) > 1 else 0
-        
+        base_filter = []
         if filter_db_name:
-            bool_query["filter"] = [{"term": {"db_name": filter_db_name}}]
-        
-        if bool_query:
-            body["query"] = {"bool": bool_query}
-        
-        if knn_list:
-            body["knn"] = knn_list[0] if len(knn_list) == 1 else knn_list
+            base_filter.append({"term": {"db_name": filter_db_name}})
+
+        if use_rrf:
+            retriever_list: List[Dict[str, Any]] = []
+
+            if query:
+                retriever_list.append({
+                    "standard": {
+                        "query": {
+                            "multi_match": {
+                                "query": query,
+                                "fields": ["all_names", "table_name"],
+                                "boost": keyword_w,
+                            }
+                        }
+                    }
+                })
+
+            if sparse_vector:
+                retriever_list.append({
+                    "standard": {
+                        "query": {
+                            "sparse_vector": {
+                                "field": "sparse_vector",
+                                "query_vector": sparse_vector,
+                                "boost": sparse_w,
+                            }
+                        }
+                    }
+                })
+
+            if dense_vector:
+                retriever_list.append({
+                    "knn": {
+                        "field": "dense_vector",
+                        "query_vector": dense_vector,
+                        "k": size,
+                        "num_candidates": size * 2,
+                        "boost": dense_w,
+                    }
+                })
+
+            if not retriever_list:
+                raise ValueError("At least one of query, sparse_vector, or dense_vector must be provided")
+
+            body: Dict[str, Any] = {
+                "size": size,
+                "retriever": {
+                    "rrf": {
+                        "retrievers": retriever_list,
+                        "rank_constant": 60,
+                        "window_size": 100,
+                    }
+                }
+            }
+
+            if base_filter:
+                body["retriever"]["rrf"]["query"] = {"bool": {"filter": base_filter}}
+
+        else:
+            should: List[Dict[str, Any]] = []
+            knn_list: List[Dict[str, Any]] = []
+
+            if query:
+                should.append({
+                    "multi_match": {
+                        "query": query,
+                        "fields": ["all_names"],
+                        "type": "best_fields",
+                        "boost": keyword_w,
+                    }
+                })
+
+            if sparse_vector:
+                should.append({
+                    "sparse_vector": {
+                        "field": "sparse_vector",
+                        "query_vector": sparse_vector,
+                        "boost": sparse_w,
+                    }
+                })
+
+            if dense_vector:
+                knn_list.append({
+                    "field": "dense_vector",
+                    "query_vector": dense_vector,
+                    "k": size,
+                    "similarity": 0.7,
+                    "boost": dense_w,
+                })
+
+            if not should and not knn_list:
+                raise ValueError("At least one of query, sparse_vector, or dense_vector must be provided")
+
+            body = {"size": size}
+
+            bool_query: Dict[str, Any] = {}
+
+            if should:
+                bool_query["should"] = should
+                bool_query["minimum_should_match"] = 1 if len(should) > 1 else 0
+
+            if base_filter:
+                bool_query["filter"] = base_filter
+
+            if bool_query:
+                body["query"] = {"bool": bool_query}
+
+            if knn_list:
+                body["knn"] = knn_list[0] if len(knn_list) == 1 else knn_list
 
         response = self.client.search(index=self.index, body=body)
         hits = response.get("hits", {}).get("hits", [])
