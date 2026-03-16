@@ -214,7 +214,7 @@ def extract_all_tables(input_file: str) -> List[TableInfo]:
 
 
 def save_to_json(table_info_list: List[TableInfo], output_file: str):
-    from nl2sql_v3.models.table_info import USE_PYDANTIC
+    from models.table_info import USE_PYDANTIC
     
     data = []
     for info in table_info_list:

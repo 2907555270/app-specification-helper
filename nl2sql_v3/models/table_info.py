@@ -1,4 +1,5 @@
 from typing import Any, Dict, List, Optional
+from nl2sql_v3.recall.base import RecallResult
 
 try:
     from pydantic import BaseModel, Field
@@ -151,3 +152,43 @@ else:
             for col in self.columns:
                 parts.extend([col.name, col.name_cn])
             return " ".join(filter(None, parts))
+
+def to_table_info(r: RecallResult) -> None:
+    columns = []
+    for col in r.columns:
+        columns.append(ColumnInfo(
+            name=col.get("name", ""),
+            name_cn=col.get("name_cn", ""),
+            type=col.get("type", ""),
+            is_primary_key=col.get("is_primary_key", False),
+            is_foreign_key=col.get("is_foreign_key", False),
+        ))
+    
+    foreign_keys = []
+    for fk in r.foreign_keys:
+        foreign_keys.append(ForeignKeyRelation(
+            source_db=fk.get("source_db", ""),
+            source_table=fk.get("source_table", ""),
+            source_column=fk.get("source_column", ""),
+            target_db=fk.get("target_db", ""),
+            target_table=fk.get("target_table", ""),
+            target_column=fk.get("target_column", ""),
+        ))
+    
+    related_tables = []
+    for rt in r.related_tables:
+        related_tables.append(RelatedTable(
+            table_name=rt.get("table_name", ""),
+            db_name=rt.get("db_name", ""),
+            join_columns=rt.get("join_columns", []),
+        ))
+    
+    return TableInfo(
+        db_name=r.db_name,
+        table_name=r.table_name,
+        table_name_cn=r.table_name_cn,
+        columns=columns,
+        primary_keys=r.primary_keys,    
+        foreign_keys=foreign_keys,
+        related_tables=related_tables,
+    )

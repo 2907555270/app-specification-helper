@@ -11,15 +11,6 @@ SQL_DIALECT_TIPS = {
     "sqlserver": "SQL Server使用T-SQL语法，注意TOP分页、GETDATE()、ISNULL处理NULL。",
 }
 
-
-class SQLGenerationResult(BaseModel):
-    sql: str
-    confidence: float
-    explanation: str
-    selected_tables: List[str]
-    used_columns: List[str]
-
-
 class PromptTemplate:
     SYSTEM_PROMPT = """你是一个专业的SQL查询生成专家。你的任务是根据用户提出的自然语言问题，从给定的表结构中选择合适的表和字段，生成对应的SQL查询语句。
 
@@ -42,9 +33,7 @@ class PromptTemplate:
 - 确保SQL语法正确
 - 考虑字段之间的关联关系
 - 如果无法生成有效的SQL，confidence应设置较低
-
-## 多轮对话：
-如果用户的问题是继续或补充问题，请结合之前的SQL和结果进行推理"""
+"""
 
     USER_PROMPT_TEMPLATE = """## 表结构信息：
 {schema}
@@ -93,7 +82,7 @@ inventory_id: int [PK] - 库存ID, product_id: int [FK] - 产品ID, quantity: in
         cls,
         query: str,
         schema: str,
-        include_fewshot: bool = True,
+        include_fewshot: bool = False,
         custom_examples: Optional[List[Dict[str, Any]]] = None,
         dialect: str = "sqlite",
     ) -> List[Dict[str, Any]]:
@@ -140,7 +129,7 @@ inventory_id: int [PK] - 库存ID, product_id: int [FK] - 产品ID, quantity: in
         query: str,
         schema: str,
         conversation_history: List[Dict[str, str]],
-        include_fewshot: bool = True,
+        include_fewshot: bool = False,
         dialect: str = "sqlite",
     ) -> List[Dict[str, Any]]:
         messages = []
@@ -190,9 +179,7 @@ class CompactPromptTemplate(PromptTemplate):
 输出JSON格式：
 {"sql": "...", "confidence": 0.0-1.0, "explanation": "...", "selected_tables": [...], "used_columns": [...]}
 
-注意：表名只使用表名，不要加数据库前缀（如用`club`而非`database.club`）。
-
-如果用户的问题是继续或补充问题，请结合之前的SQL和结果进行推理。"""
+注意：表名只使用表名，不要加数据库前缀（如用`club`而非`database.club`）。"""
 
     USER_PROMPT_TEMPLATE = """表结构:
 {schema}

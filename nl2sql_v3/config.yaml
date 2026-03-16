@@ -22,7 +22,7 @@ services:
     base_url: "https://openrouter.ai/api/v1"
     api_key: "${OPENROUTER_API_KEY}"
     analyse_model: "x-ai/grok-4.1-fast"
-    coding_model: "anthropic/claude-3-haiku"
+    coding_model: "google/gemini-2.5-flash-lite"
 
 recall:
   weights:
