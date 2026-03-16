@@ -38,7 +38,8 @@ class ElasticsearchConfig(BaseModel):
 class LLMConfig(BaseModel):
     base_url: str = "https://openrouter.ai/api/v1"
     api_key: Optional[str] = os.environ.get("OPENROUTER_API_KEY")
-    model: str = "x-ai/grok-4.1-fast"
+    analyse_model: str = "x-ai/grok-4.1-fast"
+    coding_model: str = "anthropic/claude-3-haiku"
 
 
 class ServicesConfig(BaseModel):
@@ -67,6 +68,7 @@ class RecallConfig(BaseModel):
     rerank_top_k: int = 10
     rerank_threshold: float = -float("inf")
     hybrid_search_top_k: int = 50
+    use_bge3: bool = False
 
 
 class DataConfig(BaseModel):

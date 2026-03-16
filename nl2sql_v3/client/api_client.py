@@ -127,46 +127,6 @@ class TranslateClient(APIClient):
         return result.get("translated_text", "")
 
 
-class LLMClient(APIClient):
-    def __init__(self):
-        super().__init__()
-        self.base_url = config.services.llm.base_url
-        self.api_key = config.services.llm.api_key
-        self.model = config.services.llm.model
-        if not self.api_key:
-            logger.warning("LLM API key not configured")
-
-    def chat(
-        self,
-        messages: List[Dict[str, str]],
-        temperature: float = 0.7,
-        max_tokens: int = 2000,
-    ) -> str:
-        if not self.api_key:
-            raise ValueError("LLM API key not configured")
-
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-        }
-        payload = {
-            "model": self.model,
-            "messages": messages,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-        }
-
-        response = self._post(
-            f"{self.base_url}/chat/completions",
-            json_data=payload,
-            headers=headers,
-        )
-
-        if "choices" in response and len(response["choices"]) > 0:
-            return response["choices"][0]["message"]["content"]
-        return ""
-
-
 class RerankClient(APIClient):
     def __init__(self):
         super().__init__()
@@ -193,5 +153,4 @@ sparse_vector_client = SparseVectorClient()
 dense_vector_client = DenseVectorClient()
 bge3_client = BGE3Client()
 translate_client = TranslateClient()
-llm_client = LLMClient()
 rerank_client = RerankClient()

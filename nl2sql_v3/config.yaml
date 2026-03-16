@@ -21,7 +21,8 @@ services:
   llm:
     base_url: "https://openrouter.ai/api/v1"
     api_key: "${OPENROUTER_API_KEY}"
-    model: "x-ai/grok-4.1-fast"
+    analyse_model: "x-ai/grok-4.1-fast"
+    coding_model: "anthropic/claude-3-haiku"
 
 recall:
   weights:
@@ -35,11 +36,12 @@ recall:
   keyword_threshold: 0.0
   similarity_threshold: 0.7
   # 粗筛混搜时的最大数量
-  hybrid_search_top_k: 100
+  hybrid_search_top_k: 60
   rerank_enabled: true
   # 精选后的返回结果数
-  rerank_top_k: 20
-  rerank_threshold: -20
+  rerank_top_k: 10
+  rerank_threshold: -20.0
+  use_bge3: true
 
 data:
   metadata: "../data/metadatas.json"
