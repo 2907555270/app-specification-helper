@@ -43,6 +43,16 @@ recall:
   rerank_threshold: -20.0
   use_bge3: true
 
+agent:
+  schema_builder: "compact"
+  prompt_template: "compact"
+  llm_provider: "openrouter"
+  sql_dialect: "sqlite"
+  include_fewshot: true
+  temperature: 0.0
+  max_retries: 2
+  execute_sql: true
+
 data:
   metadata: "../data/metadatas.json"
   queries: "../data/test_query_and_tables.json"

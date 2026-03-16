@@ -32,24 +32,23 @@ def cli(ctx):
 @cli.command()
 def interactive():
     """Enter interactive mode - keep asking for queries."""
+    import uuid
+    
     click.echo("=" * 60)
     click.echo("nl2sql_v3 Interactive Mode")
     click.echo("=" * 60)
     click.echo("Type 'quit' or 'exit' to exit")
+    click.echo("Type 'new' to start a new conversation")
     click.echo("Type 'help' for available commands")
     click.echo("=" * 60)
 
-    loader = MetadataLoader()
-    tables = loader.load()
-    click.echo(f"Loaded {len(tables)} tables")
-
-    retriever = HybridRetriever(
-        tables=tables,
-        weights={
-            "keyword": config.recall.weights.keyword,
-            "sparse": config.recall.weights.sparse,
-            "dense": config.recall.weights.dense,
-        }
+    conversation_id = str(uuid.uuid4())
+    
+    retriever = HybridRetriever()
+    agent_instance = create_agent()
+    pipeline = NL2SQLPipeline(
+        retriever=retriever,
+        agent=agent_instance,
     )
 
     while True:
@@ -63,29 +62,42 @@ def interactive():
                 click.echo("Goodbye!")
                 break
 
+            if query.lower() == "new":
+                conversation_id = str(uuid.uuid4())
+                click.echo("Started new conversation.")
+                continue
+
             if query.lower() == "help":
                 click.echo("Available commands:")
                 click.echo("  help - Show this help message")
                 click.echo("  quit/exit - Exit interactive mode")
-                click.echo("  <query> - Enter a natural language query to recall tables")
+                click.echo("  new - Start a new conversation")
+                click.echo("  <query> - Enter a natural language query")
                 continue
 
-            results = retriever.retrieve(query)
+            result = pipeline.run(query, conversation_id=conversation_id)
 
-            if not results:
-                click.echo("No related tables found.")
-                continue
+            click.echo("\n[Generated SQL]")
+            click.echo(result.get("sql", ""))
 
-            click.echo(f"\nTop {len(results)} Related Tables:")
-            click.echo("-" * 60)
-            header = f"{'DB Name':<20} {'Table Name':<20} {'Score':<10} {'Match Type':<10}"
-            click.echo(header)
-            click.echo("-" * 60)
+            click.echo(f"\n[Confidence] {result.get('confidence', 0.0):.2f}")
 
-            for r in results:
-                click.echo(
-                    f"{r.db_name:<20} {r.table_name:<20} {r.score:<10.4f} {r.match_type:<10}"
-                )
+            exec_result = result.get("execution_result")
+            if exec_result:
+                click.echo(f"\n[Execution Result]")
+                if "error" in exec_result:
+                    click.echo(f"  Error: {exec_result['error']}")
+                elif isinstance(exec_result, list):
+                    click.echo(f"  {len(exec_result)} rows returned:")
+                    for i, row in enumerate(exec_result[:5]):
+                        click.echo(f"  Row {i+1}: {row}")
+                    if len(exec_result) > 5:
+                        click.echo(f"  ... and {len(exec_result) - 5} more rows")
+                elif isinstance(exec_result, dict):
+                    click.echo(f"  {exec_result}")
+
+            timings = result.get("timings", {})
+            click.echo(f"\n[Timings] {timings.get('total', 0):.3f}s")
 
         except KeyboardInterrupt:
             click.echo("\nGoodbye!")

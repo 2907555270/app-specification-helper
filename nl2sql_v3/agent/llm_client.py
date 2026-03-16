@@ -87,6 +87,7 @@ class LangChainLLMClient:
     ) -> Dict[str, Any]:
         from langchain_core.messages import HumanMessage, SystemMessage
         from langchain_core.output_parsers import JsonOutputParser
+        from pydantic import BaseModel
 
         langchain_messages = []
         for msg in messages:
@@ -97,29 +98,22 @@ class LangChainLLMClient:
             else:
                 langchain_messages.append(HumanMessage(content=content))
 
-        parser = JsonOutputParser()
-        chain = self.client | parser
-
         try:
+            class SQLGenerationResult(BaseModel):
+                sql: str
+                confidence: float
+                explanation: str
+                selected_tables: List[str]
+                used_columns: List[str]
+
+            structured_llm = self.client.with_structured_output(SQLGenerationResult)
+            logger.info(f"Invoking LLM with structured output")
+            result = structured_llm.invoke(langchain_messages)
+            logger.info(f"LLM response: {result}")
+            return result.model_dump() if hasattr(result, 'model_dump') else result.dict()
+        except Exception as e:
+            logger.warning(f"Structured output failed, trying JsonOutputParser: {e}")
+            parser = JsonOutputParser()
+            chain = self.client | parser
             result = chain.invoke(langchain_messages)
             return result if isinstance(result, dict) else json.loads(result)
-        except Exception as e:
-            logger.warning(f"JSON parsing failed, trying manual parse: {e}")
-            response = self.client.invoke(langchain_messages)
-            content = response.content
-
-            try:
-                return json.loads(content)
-            except json.JSONDecodeError:
-                cleaned = content.strip()
-                if cleaned.startswith("```json"):
-                    cleaned = cleaned[7:]
-                elif cleaned.startswith("```"):
-                    cleaned = cleaned[3:]
-                if cleaned.endswith("```"):
-                    cleaned = cleaned[:-3]
-
-                try:
-                    return json.loads(cleaned.strip())
-                except json.JSONDecodeError:
-                    raise ValueError(f"Invalid JSON response from LLM: {content[:200]}")

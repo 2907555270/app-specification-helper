@@ -42,6 +42,17 @@ class LLMConfig(BaseModel):
     coding_model: str = "anthropic/claude-3-haiku"
 
 
+class AgentConfig(BaseModel):
+    schema_builder: str = "compact"
+    prompt_template: str = "compact"
+    llm_provider: str = "openrouter"
+    sql_dialect: str = "sqlite"
+    include_fewshot: bool = True
+    temperature: float = 0.0
+    max_retries: int = 2
+    execute_sql: bool = True
+
+
 class ServicesConfig(BaseModel):
     bge_m3: BGE3Config = BGE3Config()
     sparse_vector: SparseVectorConfig = SparseVectorConfig()
@@ -113,6 +124,7 @@ class LoggingConfig(BaseModel):
 class Config(BaseModel):
     services: ServicesConfig = ServicesConfig()
     recall: RecallConfig = RecallConfig()
+    agent: AgentConfig = AgentConfig()
     data: DataConfig = DataConfig()
     logging: LoggingConfig = LoggingConfig()
 

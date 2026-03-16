@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 class DatabaseManager:
     def __init__(self, database_dir: Optional[str] = None):
         if database_dir is None:
-            database_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "database")
+            database_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "test_database")
         self.database_dir = Path(database_dir)
         self._connections: Dict[str, sqlite3.Connection] = {}
 

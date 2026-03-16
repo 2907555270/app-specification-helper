@@ -3,6 +3,14 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
 
+SQL_DIALECT_TIPS = {
+    "sqlite": "SQLite不支持跨库查询，SQL中只保留表名，不要拼接库前缀",
+    "mysql": "MySQL支持窗口函数(8.0+)、CTE、递归查询。注意使用IFNULL代替COALESCE当心NULL处理。",
+    "postgresql": "PostgreSQL支持完整SQL标准，包括窗口函数、CTE、递归查询、JSON类型等。",
+    "oracle": "Oracle使用PL/SQL语法，注意ROWNUM分页、NVL处理NULL、CONNECT BY递归查询。",
+    "sqlserver": "SQL Server使用T-SQL语法，注意TOP分页、GETDATE()、ISNULL处理NULL。",
+}
+
 
 class SQLGenerationResult(BaseModel):
     sql: str
@@ -33,7 +41,10 @@ class PromptTemplate:
 - 只选择与问题相关的表，避免不必要的JOIN
 - 确保SQL语法正确
 - 考虑字段之间的关联关系
-- 如果无法生成有效的SQL，confidence应设置较低"""
+- 如果无法生成有效的SQL，confidence应设置较低
+
+## 多轮对话：
+如果用户的问题是继续或补充问题，请结合之前的SQL和结果进行推理"""
 
     USER_PROMPT_TEMPLATE = """## 表结构信息：
 {schema}
@@ -84,12 +95,18 @@ inventory_id: int [PK] - 库存ID, product_id: int [FK] - 产品ID, quantity: in
         schema: str,
         include_fewshot: bool = True,
         custom_examples: Optional[List[Dict[str, Any]]] = None,
+        dialect: str = "sqlite",
     ) -> List[Dict[str, Any]]:
         messages = []
 
+        system_prompt = cls.SYSTEM_PROMPT
+        dialect_tip = SQL_DIALECT_TIPS.get(dialect, "")
+        if dialect_tip:
+            system_prompt += f"\n\n## SQL方言提示：\n{dialect_tip}"
+
         messages.append({
             "role": "system",
-            "content": cls.SYSTEM_PROMPT
+            "content": system_prompt
         })
 
         if include_fewshot:
@@ -117,12 +134,65 @@ inventory_id: int [PK] - 库存ID, product_id: int [FK] - 产品ID, quantity: in
 
         return messages
 
+    @classmethod
+    def build_multi_turn_prompt(
+        cls,
+        query: str,
+        schema: str,
+        conversation_history: List[Dict[str, str]],
+        include_fewshot: bool = True,
+        dialect: str = "sqlite",
+    ) -> List[Dict[str, Any]]:
+        messages = []
+
+        system_prompt = cls.SYSTEM_PROMPT
+        dialect_tip = SQL_DIALECT_TIPS.get(dialect, "")
+        if dialect_tip:
+            system_prompt += f"\n\n## SQL方言提示：\n{dialect_tip}"
+
+        messages.append({
+            "role": "system",
+            "content": system_prompt
+        })
+
+        if include_fewshot:
+            examples = cls.FEWSHOT_EXAMPLES
+            for example in examples:
+                messages.append({
+                    "role": "user",
+                    "content": cls.USER_PROMPT_TEMPLATE.format(
+                        schema=example["schema"],
+                        query=example["query"]
+                    )
+                })
+                messages.append({
+                    "role": "assistant",
+                    "content": json.dumps(example["result"], ensure_ascii=False)
+                })
+
+        for msg in conversation_history:
+            messages.append(msg)
+
+        messages.append({
+            "role": "user",
+            "content": cls.USER_PROMPT_TEMPLATE.format(
+                schema=schema,
+                query=query
+            )
+        })
+
+        return messages
+
 
 class CompactPromptTemplate(PromptTemplate):
     SYSTEM_PROMPT = """你是一个SQL查询生成专家。根据表结构和用户问题，生成SQL。
 
 输出JSON格式：
-{"sql": "...", "confidence": 0.0-1.0, "explanation": "...", "selected_tables": [...], "used_columns": [...]}"""
+{"sql": "...", "confidence": 0.0-1.0, "explanation": "...", "selected_tables": [...], "used_columns": [...]}
+
+注意：表名只使用表名，不要加数据库前缀（如用`club`而非`database.club`）。
+
+如果用户的问题是继续或补充问题，请结合之前的SQL和结果进行推理。"""
 
     USER_PROMPT_TEMPLATE = """表结构:
 {schema}
