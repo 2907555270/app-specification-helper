@@ -9,8 +9,14 @@ class RecallResult(BaseModel):
     all_names: str
     score: float
     match_type: str
-    rrf_score: float
-    rerank_score: float
+    rrf_score: float = 0.0
+    rerank_score: float = -float("inf")
+    table: Optional[Any] = None
+    columns: List[Dict[str, Any]] = []
+    primary_keys: List[str] = []
+    foreign_keys: List[Dict[str, Any]] = []
+    related_tables: List[Dict[str, Any]] = []
+    table_name_cn: str = ""
 
 class TableMatch(BaseModel):
     db_name: str

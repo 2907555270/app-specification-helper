@@ -1,3 +1,4 @@
+from asyncio.events import BaseDefaultEventLoopPolicy
 import logging
 import sys
 import os
@@ -18,25 +19,25 @@ class HybridRetriever:
     def __init__(
         self,
         weights: Optional[Dict[str, float]] = None,
-        top_k: Optional[int] = None,
+        top_k: int = config.recall.top_k,
         use_keyword: bool = True,
         use_sparse: bool = True,
         use_dense: bool = True,
-        use_rrf: Optional[bool] = None,
-        use_rerank: Optional[bool] = None,
-        use_bge3: bool = True,
+        use_rrf: bool = config.recall.rrf_enabled,
+        use_rerank: bool = config.recall.rerank_enabled,
+        use_bge3: bool = config.recall.use_bge3,
     ):
         self.weights = weights or {
             "keyword": config.recall.weights.keyword,
             "sparse": config.recall.weights.sparse,
             "dense": config.recall.weights.dense,
         }
-        self.top_k = top_k if top_k is not None else config.recall.top_k
+        self.top_k = top_k
         self.use_keyword = use_keyword
         self.use_sparse = use_sparse
         self.use_dense = use_dense
-        self.use_rrf = use_rrf if use_rrf is not None else config.recall.rrf_enabled
-        self.use_rerank = use_rerank if use_rerank is not None else config.recall.rerank_enabled
+        self.use_rrf = use_rrf
+        self.use_rerank = use_rerank
         self.use_bge3 = use_bge3
         self.rerank_top_k = config.recall.rerank_top_k
         self.rerank_threshold = config.recall.rerank_threshold
@@ -106,6 +107,11 @@ class HybridRetriever:
                     rerank_score=-float("inf"),
                     rrf_score=doc.get("rrf_score", 0.0),
                     match_type="hybrid",
+                    columns=doc.get("columns", []),
+                    primary_keys=doc.get("primary_keys", []),
+                    foreign_keys=doc.get("foreign_keys", []),
+                    related_tables=doc.get("related_tables", []),
+                    table_name_cn=doc.get("table_name_cn", ""),
                 )
             )
 
