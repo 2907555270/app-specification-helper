@@ -102,6 +102,7 @@ class NL2SQLAgent:
             else:
                 langchain_messages.append(HumanMessage(content=msg["content"]))
         
+        logger.info(f"NL2SQL input messages: {langchain_messages}")
         result: SQLGenerationResult = self.structured_llm.invoke(langchain_messages)
 
         llm_time = time.time() - start_time

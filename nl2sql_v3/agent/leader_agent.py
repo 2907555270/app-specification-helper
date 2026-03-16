@@ -1,4 +1,5 @@
 import logging
+import time
 from typing import Any, Dict, List, Optional
 
 from langgraph.prebuilt import ToolNode
@@ -161,10 +162,12 @@ if __name__ == "__main__":
                 print("再见!")
                 break
             
+            start_time = time.time()
             resp = agent.run(
                 user_input=user_input,
                 conversation_id=conversation_id
             )
+            logger.info(f"[{conversation_id}] Response time: {time.time() - start_time:.2f}s")
             print(f"\n助手: {resp['output']}")
             
         except KeyboardInterrupt:

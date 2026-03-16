@@ -1,13 +1,15 @@
 import logging
 import sys
 import os
+import time
 from typing import Optional
 
 import click
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from nl2sql_v3.agent.agent import NL2SQLAgent, NL2SQLPipeline, create_agent
+from nl2sql_v3.agent.leader_agent import InteractiveNL2SQLAgent
+from nl2sql_v3.agent.nl2sql_agent import NL2SQLAgent
 from nl2sql_v3.client.es_client import es_client
 from nl2sql_v3.config import config
 from nl2sql_v3.data.evaluator import Evaluator
@@ -26,16 +28,17 @@ logger = logging.getLogger(__name__)
 def cli(ctx):
     """nl2sql_v3 - Natural Language to SQL Table Retrieval CLI Tool"""
     if ctx.invoked_subcommand is None:
-        ctx.invoke(interactive)
+        ctx.invoke(chat)
 
 
 @cli.command()
-def interactive():
-    """Enter interactive mode - keep asking for queries."""
+def chat():
+    """Enter interactive multi-turn conversation mode with BI Assistant."""
     import uuid
     
     click.echo("=" * 60)
-    click.echo("nl2sql_v3 Interactive Mode")
+    click.echo("nl2sql_v3 Multi-turn Chat Mode")
+    click.echo("基于 LangGraph 的智能 BI 助手，支持多轮对话")
     click.echo("=" * 60)
     click.echo("Type 'quit' or 'exit' to exit")
     click.echo("Type 'new' to start a new conversation")
@@ -43,68 +46,48 @@ def interactive():
     click.echo("=" * 60)
 
     conversation_id = str(uuid.uuid4())
-    
-    retriever = HybridRetriever()
-    agent_instance = create_agent()
-    pipeline = NL2SQLPipeline(
-        retriever=retriever,
-        agent=agent_instance,
-    )
+    agent = InteractiveNL2SQLAgent()
 
     while True:
         try:
-            query = input("\n> ").strip()
+            user_input = input("\n> ").strip()
 
-            if not query:
+            if not user_input:
                 continue
 
-            if query.lower() in ["quit", "exit", "q"]:
+            if user_input.lower() in ["quit", "exit", "q"]:
                 click.echo("Goodbye!")
                 break
 
-            if query.lower() == "new":
+            if user_input.lower() == "new":
                 conversation_id = str(uuid.uuid4())
                 click.echo("Started new conversation.")
                 continue
 
-            if query.lower() == "help":
+            if user_input.lower() == "help":
                 click.echo("Available commands:")
                 click.echo("  help - Show this help message")
-                click.echo("  quit/exit - Exit interactive mode")
+                click.echo("  quit/exit - Exit chat mode")
                 click.echo("  new - Start a new conversation")
                 click.echo("  <query> - Enter a natural language query")
                 continue
 
-            result = pipeline.run(query, conversation_id=conversation_id)
-
-            click.echo("\n[Generated SQL]")
-            click.echo(result.get("sql", ""))
-
-            click.echo(f"\n[Confidence] {result.get('confidence', 0.0):.2f}")
-
-            exec_result = result.get("execution_result")
-            if exec_result:
-                click.echo(f"\n[Execution Result]")
-                if "error" in exec_result:
-                    click.echo(f"  Error: {exec_result['error']}")
-                elif isinstance(exec_result, list):
-                    click.echo(f"  {len(exec_result)} rows returned:")
-                    for i, row in enumerate(exec_result[:5]):
-                        click.echo(f"  Row {i+1}: {row}")
-                    if len(exec_result) > 5:
-                        click.echo(f"  ... and {len(exec_result) - 5} more rows")
-                elif isinstance(exec_result, dict):
-                    click.echo(f"  {exec_result}")
-
-            timings = result.get("timings", {})
-            click.echo(f"\n[Timings] {timings.get('total', 0):.3f}s")
+            start_time = time.time()
+            resp = agent.run(
+                user_input=user_input,
+                conversation_id=conversation_id
+            )
+            elapsed = time.time() - start_time
+            
+            click.echo(f"\n[Response ({elapsed:.2f}s)]")
+            click.echo(resp["output"])
 
         except KeyboardInterrupt:
             click.echo("\nGoodbye!")
             break
         except Exception as e:
             click.echo(f"Error: {e}")
-            logger.exception("Query failed")
+            logger.exception("Chat failed")
 
 
 @cli.command()
@@ -352,11 +335,6 @@ def evaluate(
     help="LLM temperature",
 )
 @click.option(
-    "--full",
-    is_flag=True,
-    help="Use full schema and prompt (default is compact)",
-)
-@click.option(
     "--weights",
     "-w",
     default="0.1,0.6,0.3",
@@ -387,7 +365,6 @@ def agent(
     query: str,
     no_fewshot: bool,
     temperature: float,
-    full: bool,
     weights: str = None,
     no_keyword: bool = False,
     no_sparse: bool = False,
@@ -420,31 +397,23 @@ def agent(
             use_dense=not no_dense,
         )
 
-        agent_instance = create_agent(
-            use_compact_prompt=not full,
-            use_compact_schema=not full,
+        nl2sql_agent = NL2SQLAgent(
+            retriever=retriever,
             include_fewshot=not no_fewshot,
             temperature=temperature,
-        )
-
-        pipeline = NL2SQLPipeline(
-            retriever=retriever,
-            agent=agent_instance,
         )
 
         click.echo("=" * 60)
         click.echo(f"Query: {query}")
         click.echo("=" * 60)
 
-        result = pipeline.run(query, execute_sql=not no_execute)
+        result = nl2sql_agent.run(query)
 
         click.echo("\n[Timings]")
-        timings = result.get("timings", {})
-        for stage, duration in timings.items():
-            click.echo(f"  {stage}: {duration:.3f}s")
+        click.echo(f"  total: {result.get('timings', {}).get('total', 0):.3f}s")
 
         click.echo("\n[Recalled Tables]")
-        for tbl in result.get("recalled_tables", []):
+        for tbl in result.get("selected_tables", []):
             click.echo(f"  - {tbl}")
 
         click.echo(f"\n[Generated SQL]")
@@ -453,10 +422,6 @@ def agent(
         click.echo(f"\n[Confidence] {result.get('confidence', 0.0):.2f}")
         click.echo(f"\n[Explanation]")
         click.echo(result.get("explanation", ""))
-
-        click.echo(f"\n[Selected Tables]")
-        for tbl in result.get("selected_tables", []):
-            click.echo(f"  - {tbl}")
 
         click.echo(f"\n[Used Columns]")
         for col in result.get("used_columns", []):
