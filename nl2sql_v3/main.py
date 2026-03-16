@@ -7,6 +7,7 @@ import click
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from nl2sql_v3.agent.agent import NL2SQLAgent, NL2SQLPipeline, create_agent
 from nl2sql_v3.client.es_client import es_client
 from nl2sql_v3.config import config
 from nl2sql_v3.data.evaluator import Evaluator
@@ -239,24 +240,11 @@ def build_index(force: bool, batch_size: int):
 
 @cli.command()
 @click.option(
-    "--db",
-    "-d",
-    default=None,
-    type=str,
-    help="Filter by database name",
-)
-@click.option(
     "--output",
     "-o",
     default=None,
     type=str,
     help="Output file for results",
-)
-@click.option(
-    "--verbose",
-    "-v",
-    is_flag=True,
-    help="Show detailed results",
 )
 @click.option(
     "--no-keyword",
@@ -274,9 +262,7 @@ def build_index(force: bool, batch_size: int):
     help="Disable dense vector recall",
 )
 def evaluate(
-    db: Optional[str],
     output: Optional[str],
-    verbose: bool,
     no_keyword: bool,
     no_sparse: bool,
     no_dense: bool,
@@ -336,6 +322,151 @@ def evaluate(
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         logger.exception("Evaluation failed")
+        sys.exit(1)
+
+
+@cli.command()
+@click.argument("query", type=str)
+@click.option(
+    "--no-fewshot",
+    is_flag=True,
+    help="Disable few-shot examples in prompt",
+)
+@click.option(
+    "--temperature",
+    "-t",
+    default=0.0,
+    type=float,
+    help="LLM temperature",
+)
+@click.option(
+    "--full",
+    is_flag=True,
+    help="Use full schema and prompt (default is compact)",
+)
+@click.option(
+    "--weights",
+    "-w",
+    default="0.1,0.6,0.3",
+    type=str,
+    help="Fusion weights (keyword,sparse,dense)",
+)
+@click.option(
+    "--no-keyword",
+    is_flag=True,
+    help="Disable keyword recall",
+)
+@click.option(
+    "--no-sparse",
+    is_flag=True,
+    help="Disable sparse vector recall",
+)
+@click.option(
+    "--no-dense",
+    is_flag=True,
+    help="Disable dense vector recall",
+)
+@click.option(
+    "--no-execute",
+    is_flag=True,
+    help="Disable SQL execution",
+)
+def agent(
+    query: str,
+    no_fewshot: bool,
+    temperature: float,
+    full: bool,
+    weights: str = None,
+    no_keyword: bool = False,
+    no_sparse: bool = False,
+    no_dense: bool = False,
+    no_execute: bool = False,
+):
+    """Generate SQL from natural language query using agent."""
+    try:
+        if weights is None:
+            weights_dict = {
+                "keyword": config.recall.weights.keyword,
+                "sparse": config.recall.weights.sparse,
+                "dense": config.recall.weights.dense,
+            }
+        else:
+            weight_list = [float(w) for w in weights.split(",")]
+            weights_dict = {
+                "keyword": weight_list[0],
+                "sparse": weight_list[1],
+                "dense": weight_list[2],
+            }
+        if len(weight_list) != 3:
+            click.echo("Error: Weights must be three comma-separated values", err=True)
+            sys.exit(1)
+
+        retriever = HybridRetriever(
+            weights=weights_dict,
+            use_keyword=not no_keyword,
+            use_sparse=not no_sparse,
+            use_dense=not no_dense,
+        )
+
+        agent_instance = create_agent(
+            use_compact_prompt=not full,
+            use_compact_schema=not full,
+            include_fewshot=not no_fewshot,
+            temperature=temperature,
+        )
+
+        pipeline = NL2SQLPipeline(
+            retriever=retriever,
+            agent=agent_instance,
+        )
+
+        click.echo("=" * 60)
+        click.echo(f"Query: {query}")
+        click.echo("=" * 60)
+
+        result = pipeline.run(query, execute_sql=not no_execute)
+
+        click.echo("\n[Timings]")
+        timings = result.get("timings", {})
+        for stage, duration in timings.items():
+            click.echo(f"  {stage}: {duration:.3f}s")
+
+        click.echo("\n[Recalled Tables]")
+        for tbl in result.get("recalled_tables", []):
+            click.echo(f"  - {tbl}")
+
+        click.echo(f"\n[Generated SQL]")
+        click.echo(result.get("sql", ""))
+
+        click.echo(f"\n[Confidence] {result.get('confidence', 0.0):.2f}")
+        click.echo(f"\n[Explanation]")
+        click.echo(result.get("explanation", ""))
+
+        click.echo(f"\n[Selected Tables]")
+        for tbl in result.get("selected_tables", []):
+            click.echo(f"  - {tbl}")
+
+        click.echo(f"\n[Used Columns]")
+        for col in result.get("used_columns", []):
+            click.echo(f"  - {col}")
+
+        exec_result = result.get("execution_result")
+        if exec_result:
+            click.echo(f"\n[Execution Result]")
+            if "error" in exec_result:
+                click.echo(f"  Error: {exec_result['error']}")
+            elif isinstance(exec_result, list):
+                click.echo(f"  {len(exec_result)} rows returned:")
+                for i, row in enumerate(exec_result[:10]):
+                    click.echo(f"  Row {i+1}: {row}")
+                if len(exec_result) > 10:
+                    click.echo(f"  ... and {len(exec_result) - 10} more rows")
+            elif isinstance(exec_result, dict):
+                click.echo(f"  {exec_result}")
+
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        logger.exception("Agent failed")
         sys.exit(1)
 
 
